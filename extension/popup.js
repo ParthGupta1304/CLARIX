@@ -200,6 +200,7 @@ async function runAnalysis({ type, content, url }) {
       verdict: d.verdictDetail ?? { icon: '⚠️', text: d.verdict || 'Unknown', explanation: d.explanation || '' },
       breakdown: d.breakdown ?? { factCheck: d.factCheck ?? 0, sourceCredibility: d.sourceCredibility ?? 0, sentiment: d.sentimentBias ?? 0 },
       sources: d.sources ?? [],
+      mlPrediction: d.mlPrediction ?? null,
     };
     hideLoading();
     renderResults(mapped);
@@ -245,7 +246,7 @@ function simulateResult(type, content) {
 //  Render Results
 // ─────────────────────────────────────────────────────────
 function renderResults(data) {
-  const { trustScore, verdict, breakdown, sources } = data;
+  const { trustScore, verdict, breakdown, sources, mlPrediction } = data;
 
   // Trust Score Ring
   const circumference = 251.3;
@@ -266,6 +267,23 @@ function renderResults(data) {
   setBar(barFactCheck, scoreFactCheck, breakdown.factCheck);
   setBar(barSource,    scoreSource,    breakdown.sourceCredibility);
   setBar(barSentiment, scoreSentiment, breakdown.sentiment);
+
+  // ML Model Prediction badge
+  const mlBox = document.getElementById('mlPredictionBox');
+  if (mlPrediction && mlBox) {
+    const mlLabel = document.getElementById('mlLabel');
+    const mlConf  = document.getElementById('mlConfidence');
+    const mlReal  = document.getElementById('mlReal');
+    const mlFake  = document.getElementById('mlFake');
+    mlLabel.textContent = mlPrediction.label;
+    mlLabel.style.color = mlPrediction.label === 'REAL' ? '#8ecfaa' : '#e08c8c';
+    mlConf.textContent  = `${mlPrediction.confidence}%`;
+    mlReal.textContent  = `${mlPrediction.realProbability}%`;
+    mlFake.textContent  = `${mlPrediction.fakeProbability}%`;
+    mlBox.style.display = '';
+  } else if (mlBox) {
+    mlBox.style.display = 'none';
+  }
 
   // Explanation
   explanationText.textContent = verdict.explanation;

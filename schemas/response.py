@@ -84,3 +84,12 @@ class VerifyResponse(BaseModel):
 class ErrorResponse(BaseModel):
     error: str
     detail: str | None = None
+
+
+class PredictResponse(BaseModel):
+    """Output from the HuggingFace fake news detector."""
+
+    label: str = Field(description="FAKE or REAL")
+    confidence: float = Field(ge=0, le=100, description="Confidence % of the predicted label")
+    real_probability: float = Field(ge=0, le=100, description="Probability % the text is real")
+    fake_probability: float = Field(ge=0, le=100, description="Probability % the text is fake")

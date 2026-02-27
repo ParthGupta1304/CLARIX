@@ -45,9 +45,9 @@ router.post(
 /**
  * @route   GET /api/analyze/history
  * @desc    Get analysis history for current session
- * @access  Session required
+ * @access  Requires API key or session
  */
-router.get('/history', requireSession, analyzeController.getHistory);
+router.get('/history', requireAuth, analyzeController.getHistory);
 
 /**
  * @route   POST /api/analyze/async/url

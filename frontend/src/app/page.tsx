@@ -41,6 +41,13 @@ import MinimalHero from "@/components/ui/hero-minimalism";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
 
 /* ── Types ──────────────────────────────────────────────── */
+interface MLPrediction {
+  label: "REAL" | "FAKE";
+  confidence: number;
+  realProbability: number;
+  fakeProbability: number;
+}
+
 interface AnalysisResult {
   score: number;
   verdict: "Credible" | "Uncertain" | "Misleading";
@@ -49,6 +56,7 @@ interface AnalysisResult {
   sentimentBias: number;
   explanation: string;
   sources: { title: string; url: string }[];
+  mlPrediction: MLPrediction | null;
 }
 
 /* ── API helpers ────────────────────────────────────────── */
@@ -73,6 +81,7 @@ async function analyzeContent(
     sentimentBias: d.sentimentBias ?? 0,
     explanation: d.explanation ?? d.analysis?.explanation ?? "",
     sources: d.sources ?? [],
+    mlPrediction: d.mlPrediction ?? null,
   };
 }
 
@@ -687,6 +696,43 @@ export default function Home() {
                       value={result.sentimentBias}
                     />
                   </div>
+
+                  {/* ML Model Prediction */}
+                  {result.mlPrediction && (
+                    <>
+                      <Separator />
+                      <div className="flex flex-col gap-2">
+                        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          ML Model Prediction
+                        </h3>
+                        <div className="flex items-center justify-between rounded-lg bg-surface-2 p-3">
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              variant="outline"
+                              className={`text-xs font-bold ${
+                                result.mlPrediction.label === "REAL"
+                                  ? "bg-pastel-green/15 text-pastel-green border-pastel-green/25"
+                                  : "bg-pastel-red/15 text-pastel-red border-pastel-red/25"
+                              }`}
+                            >
+                              {result.mlPrediction.label}
+                            </Badge>
+                            <span className="text-sm font-semibold">
+                              {result.mlPrediction.confidence}% confidence
+                            </span>
+                          </div>
+                          <div className="flex gap-3 text-[11px] text-muted-foreground">
+                            <span>
+                              Real: <strong className="text-pastel-green">{result.mlPrediction.realProbability}%</strong>
+                            </span>
+                            <span>
+                              Fake: <strong className="text-pastel-red">{result.mlPrediction.fakeProbability}%</strong>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
 
                   <Separator />
 

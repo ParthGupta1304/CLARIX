@@ -8,3 +8,5 @@ python-dotenv==1.0.1
 tenacity==9.0.0
 pytest==8.3.4
 pytest-asyncio==0.25.0
+transformers>=4.40.0
+torch>=2.2.0

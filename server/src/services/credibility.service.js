@@ -4,6 +4,7 @@ const logger = require('../utils/logger');
 const cacheService = require('./cache.service');
 const contentParserService = require('./content-parser.service');
 const llmService = require('./llm.service');
+const mlService = require('./ml.service');
 const ragService = require('./rag.service');
 
 class CredibilityService {
@@ -125,8 +126,20 @@ class CredibilityService {
       },
     });
 
-    // 2. Extract claims from content
-    const extractedClaims = await llmService.extractClaims(content, title);
+    // 2. Extract claims + run ML prediction in parallel
+    const [extractedClaims, mlPrediction] = await Promise.all([
+      llmService.extractClaims(content, title),
+      mlService.predictFakeNews(content).catch((err) => {
+        logger.warn(`ML prediction failed: ${err.message}`);
+        return null;
+      }),
+    ]);
+
+    if (mlPrediction) {
+      logger.info(
+        `ML model says: ${mlPrediction.label} (${mlPrediction.confidence}% confidence, fake_prob=${mlPrediction.fake_probability}%)`
+      );
+    }
     
     // 3. Retrieve relevant context for claims (RAG)
     const retrievedContext = await ragService.retrieveForClaims(extractedClaims);
@@ -152,6 +165,18 @@ class CredibilityService {
       contentType
     );
 
+    // 7b. Blend ML model prediction into the score (30% ML weight, 70% LLM weight)
+    let finalScore = adjustedScore.score;
+    if (mlPrediction) {
+      // ML real_probability maps to credibility (high real_prob → high score)
+      const mlScore = Math.round(mlPrediction.real_probability);
+      finalScore = Math.round(adjustedScore.score * 0.7 + mlScore * 0.3);
+      finalScore = Math.max(0, Math.min(100, finalScore));
+      logger.info(
+        `Score blending: LLM=${adjustedScore.score} + ML=${mlScore} → final=${finalScore}`
+      );
+    }
+
     // 8. Calculate verified claims count
     const verifiedCount = verifications.filter(v => v.status === 'VERIFIED').length;
 
@@ -159,7 +184,7 @@ class CredibilityService {
     const analysisResult = await prisma.analysisResult.create({
       data: {
         articleId: article.id,
-        score: adjustedScore.score,
+        score: finalScore,
         confidence: adjustedScore.confidence,
         explanation: credibilityResult.explanation,
         summary: credibilityResult.summary,
@@ -179,7 +204,7 @@ class CredibilityService {
     // 10. Log the request
     await this.logRequest(sessionId, originalUrl ? 'URL' : 'TEXT', originalUrl, urlHash, 'COMPLETED', analysisResult.id);
 
-    return this.formatAnalysisResult(article, analysisResult, storedClaims, credibilityResult);
+    return this.formatAnalysisResult(article, analysisResult, storedClaims, credibilityResult, mlPrediction);
   }
 
   /**
@@ -270,7 +295,7 @@ class CredibilityService {
    *   - Extension (popup.js) → trustScore, verdict{icon,text,explanation}, breakdown, sources
    *   - Internal / admin     → full credibility, extension, claims, meta blocks
    */
-  formatAnalysisResult(article, analysisResult, claims = [], credibilityDetails = {}) {
+  formatAnalysisResult(article, analysisResult, claims = [], credibilityDetails = {}, mlPrediction = null) {
     const scoreCategory = this.getScoreCategory(analysisResult.score);
     const verdict = this.mapVerdict(analysisResult.score);
 
@@ -366,6 +391,16 @@ class CredibilityService {
         processingTime: analysisResult.processingTime,
         analyzedAt: analysisResult.createdAt,
       },
+
+      // ── ML Model prediction (HuggingFace) ────────────────
+      mlPrediction: mlPrediction
+        ? {
+            label: mlPrediction.label,
+            confidence: mlPrediction.confidence,
+            realProbability: mlPrediction.real_probability,
+            fakeProbability: mlPrediction.fake_probability,
+          }
+        : null,
     };
   }
 

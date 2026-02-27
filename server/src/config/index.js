@@ -34,6 +34,12 @@ const config = {
     supabaseServiceKey: process.env.SUPABASE_SERVICE_KEY,
   },
 
+  // Clarix Python engine (FastAPI)
+  clarixEngine: {
+    url: process.env.CLARIX_ENGINE_URL || 'http://127.0.0.1:8000',
+    internalToken: process.env.CLARIX_INTERNAL_TOKEN || '',
+  },
+
   // Rate Limiting
   rateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 60000,

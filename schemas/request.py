@@ -39,3 +39,14 @@ class VerifyRequest(BaseModel):
     )
 
     model_config = {"populate_by_name": True}
+
+
+class PredictRequest(BaseModel):
+    """Payload for the HuggingFace fake news detection endpoint."""
+
+    text: str = Field(
+        ...,
+        min_length=1,
+        max_length=50_000,
+        description="Text content to classify as REAL or FAKE.",
+    )
