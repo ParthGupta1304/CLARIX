@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clarix</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">
+        <div class="logo-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="#c8c8c8" stroke-width="2" stroke-linejoin="round"/>
+            <path d="M2 17l10 5 10-5" stroke="#c8c8c8" stroke-width="2" stroke-linejoin="round"/>
+            <path d="M2 12l10 5 10-5" stroke="#c8c8c8" stroke-width="2" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <span class="logo-text">Clarix</span>
+        <span class="logo-badge">BETA</span>
+      </div>
+      <div class="header-actions">
+        <button class="icon-btn" id="settingsBtn" title="Settings">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.07 4.93A10 10 0 0 0 4.93 4.93M4.93 19.07A10 10 0 0 0 19.07 19.07M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" data-tab="text">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        Text / Claim
+      </button>
+      <button class="tab" data-tab="image">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        Image / Media
+      </button>
+      <button class="tab" data-tab="page">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        Full Page
+      </button>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="tab-content">
+
+      <!-- TEXT TAB -->
+      <div class="tab-pane active" id="tab-text">
+        <div class="input-area">
+          <div class="input-header">
+            <span class="input-label">Paste or type a claim to verify</span>
+            <button class="chip-btn" id="pasteSelectionBtn">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+              Use selection
+            </button>
+          </div>
+          <textarea id="textInput" class="textarea" placeholder="E.g. 'Scientists confirm chocolate cures cancer…'" rows="4"></textarea>
+          <div class="char-count"><span id="charCount">0</span> / 1000</div>
+        </div>
+        <button class="analyze-btn" id="analyzeTextBtn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          Analyze Claim
+        </button>
+      </div>
+
+      <!-- IMAGE TAB -->
+      <div class="tab-pane" id="tab-image">
+        <div class="dropzone" id="dropzone">
+          <div class="dropzone-inner">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="dropzone-icon"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            <p class="dropzone-text">Drop image here</p>
+            <p class="dropzone-sub">or <label for="fileInput" class="file-label">browse file</label></p>
+            <input type="file" id="fileInput" accept="image/*" hidden />
+          </div>
+        </div>
+        <div class="or-divider">
+          <span>or enter image URL</span>
+        </div>
+        <input type="url" id="imageUrlInput" class="url-input" placeholder="https://example.com/image.jpg" />
+        <button class="analyze-btn" id="analyzeImageBtn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          Analyze Image
+        </button>
+      </div>
+
+      <!-- PAGE TAB -->
+      <div class="tab-pane" id="tab-page">
+        <div class="page-info" id="pageInfo">
+          <div class="page-info-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          </div>
+          <div class="page-info-text">
+            <p class="page-title" id="currentPageTitle">Loading page info…</p>
+            <p class="page-url" id="currentPageUrl"></p>
+          </div>
+        </div>
+        <p class="page-hint">Clarix will scan the article headlines, main content, and any embedded images on this page for potential misinformation.</p>
+        <button class="analyze-btn" id="analyzePageBtn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          Scan Full Page
+        </button>
+      </div>
+    </div>
+
+    <!-- Results Panel -->
+    <div class="results-panel hidden" id="resultsPanel">
+      <div class="results-header">
+        <span class="results-title">Analysis Result</span>
+        <button class="icon-btn" id="closeResultsBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <!-- Trust Score Ring -->
+      <div class="score-container">
+        <div class="score-ring-wrapper">
+          <svg class="score-ring" width="100" height="100" viewBox="0 0 100 100">
+            <circle class="ring-bg" cx="50" cy="50" r="40" />
+            <circle class="ring-fill" id="ringFill" cx="50" cy="50" r="40" />
+          </svg>
+          <!-- No defs needed; ring color driven by JS .style.stroke -->
+          <div class="score-center">
+            <span class="score-value" id="scoreValue">--</span>
+            <span class="score-label">Trust</span>
+          </div>
+        </div>
+        <div class="verdict-box" id="verdictBox">
+          <span class="verdict-icon" id="verdictIcon">🔍</span>
+          <span class="verdict-text" id="verdictText">Analyzing…</span>
+        </div>
+      </div>
+
+      <!-- Breakdown -->
+      <div class="breakdown" id="breakdown">
+        <div class="breakdown-title">Signal Breakdown</div>
+        <div class="breakdown-item">
+          <span class="breakdown-label">Fact-Check</span>
+          <div class="breakdown-bar-track"><div class="breakdown-bar" id="barFactCheck" style="width:0%"></div></div>
+          <span class="breakdown-score" id="scoreFactCheck">--</span>
+        </div>
+        <div class="breakdown-item">
+          <span class="breakdown-label">Source Credibility</span>
+          <div class="breakdown-bar-track"><div class="breakdown-bar" id="barSource" style="width:0%"></div></div>
+          <span class="breakdown-score" id="scoreSource">--</span>
+        </div>
+        <div class="breakdown-item">
+          <span class="breakdown-label">Sentiment / Bias</span>
+          <div class="breakdown-bar-track"><div class="breakdown-bar" id="barSentiment" style="width:0%"></div></div>
+          <span class="breakdown-score" id="scoreSentiment">--</span>
+        </div>
+      </div>
+
+      <!-- Explanation -->
+      <div class="explanation" id="explanationBox">
+        <div class="explanation-title">Why?</div>
+        <p class="explanation-text" id="explanationText">Awaiting analysis…</p>
+      </div>
+
+      <!-- Sources -->
+      <div class="sources" id="sourcesBox" style="display:none">
+        <div class="sources-title">Sources</div>
+        <div id="sourcesList" class="sources-list"></div>
+      </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay hidden" id="loadingOverlay">
+      <div class="loading-content">
+        <div class="spinner"></div>
+        <p class="loading-text" id="loadingText">Analyzing…</p>
+        <p class="loading-sub">This may take a few seconds</p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span>Clarix v1.0 · <a href="#" class="footer-link" id="openDashboardLink">Open Dashboard</a></span>
+      <span class="footer-dot">·</span>
+      <a href="#" class="footer-link" id="reportLink">Report Issue</a>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
