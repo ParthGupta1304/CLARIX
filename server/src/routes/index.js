@@ -3,6 +3,8 @@ const analyzeRoutes = require('./analyze.routes');
 const feedRoutes = require('./feed.routes');
 const feedbackRoutes = require('./feedback.routes');
 const sessionRoutes = require('./session.routes');
+const adminRoutes = require('./admin.routes');
+const { requireAuth } = require('../middleware');
 
 const router = express.Router();
 
@@ -21,5 +23,6 @@ router.use('/analyze', analyzeRoutes);
 router.use('/feed', feedRoutes);
 router.use('/feedback', feedbackRoutes);
 router.use('/session', sessionRoutes);
+router.use('/admin', requireAuth, adminRoutes);
 
 module.exports = router;

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { feedController } = require('../controllers');
+const { requireSession, feedbackLimiter } = require('../middleware');
 const { validate, swipeFeedbackSchema } = require('../validators');
 
 /**
@@ -10,6 +11,8 @@ const { validate, swipeFeedbackSchema } = require('../validators');
  */
 router.post(
   '/swipe',
+  feedbackLimiter,
+  requireSession,
   validate(swipeFeedbackSchema),
   feedController.recordSwipe
 );

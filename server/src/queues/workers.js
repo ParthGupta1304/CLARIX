@@ -1,5 +1,6 @@
-const { analysisQueue, feedQueue } = require('./index');
+const { initQueues } = require('./index');
 const { credibilityService, feedService, llmService } = require('../services');
+const config = require('../config');
 const prisma = require('../lib/prisma');
 const logger = require('../utils/logger');
 
@@ -7,6 +8,12 @@ const logger = require('../utils/logger');
  * Process analysis jobs
  */
 const setupAnalysisWorker = () => {
+  const { analysisQueue } = initQueues();
+  if (!analysisQueue) {
+    logger.warn('Analysis worker not started — queue unavailable');
+    return;
+  }
+
   analysisQueue.process('analyze', async (job) => {
     const { url, text, sessionId, requestId } = job.data;
     
@@ -61,6 +68,12 @@ const setupAnalysisWorker = () => {
  * Process feed refresh jobs
  */
 const setupFeedWorker = () => {
+  const { feedQueue } = initQueues();
+  if (!feedQueue) {
+    logger.warn('Feed worker not started — queue unavailable');
+    return;
+  }
+
   feedQueue.process('refresh', async (job) => {
     logger.info(`Processing feed refresh job ${job.id}`);
 
@@ -85,7 +98,7 @@ const setupFeedWorker = () => {
 
       for (const article of recentArticles) {
         const analysis = article.analysisResults[0];
-        if (!analysis || analysis.score < 60) continue; // Only add credible content
+        if (!analysis || analysis.score < config.scoring.feedMinScore) continue; // Only add content above threshold
 
         // Check if already in feed
         const existing = await prisma.feedItem.findFirst({

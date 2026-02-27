@@ -87,12 +87,16 @@ Return a JSON object with:
   "recommendations": ["<suggestions for readers>"]
 }
 
-Scoring guidelines:
-- 80-100: Highly credible, well-sourced, factual
-- 60-79: Generally credible with minor issues
-- 40-59: Mixed credibility, verify claims independently  
-- 20-39: Low credibility, significant issues
-- 0-19: Very low credibility, likely misinformation`;
+Scoring guidelines (CLARIX credibility bands):
+- 90-100: AUTHORIZED — Highly credible, well-sourced, factual, verified by multiple reliable sources
+- 60-89: SUSPICIOUS — Generally credible but unverified, minor issues, or limited sourcing. Needs caution.
+- 40-59: FLAGGED — Mixed credibility, significant issues, likely misinformation or misleading
+- 20-39: FLAGGED — Low credibility, major factual errors, unreliable sources
+- 0-19: FLAGGED — Very low credibility, likely fake news or deliberate misinformation
+
+IMPORTANT: Only assign 90+ to articles with strong sourcing, verified facts, and professional journalism standards. 
+60-89 should be the default range for news with some but not full verification.
+Below 60 should be reserved for clearly problematic content.`;
 
     const claimsSummary = claims.length > 0 
       ? `\n\nExtracted Claims:\n${claims.map((c, i) => `${i + 1}. ${c.text}`).join('\n')}`

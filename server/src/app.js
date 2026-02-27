@@ -30,8 +30,8 @@ app.use(cors({
   origin: config.isDev 
     ? '*' 
     : [
-        'chrome-extension://*',
-        'moz-extension://*',
+        /^chrome-extension:\/\//,
+        /^moz-extension:\/\//,
         /\.clarix\.app$/,
       ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],

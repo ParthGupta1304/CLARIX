@@ -4,10 +4,10 @@ const app = require('./app');
 const config = require('./config');
 const logger = require('./utils/logger');
 const prisma = require('./lib/prisma');
-const { createRedisClient, closeRedis } = require('./lib/redis');
+const { createRedisClient, closeRedis, isRedisAvailable } = require('./lib/redis');
 const { cacheService, ragService } = require('./services');
 const { startWorkers } = require('./queues/workers');
-const { closeQueues } = require('./queues');
+const { initQueues, closeQueues, queueFeedRefresh } = require('./queues');
 
 // Graceful shutdown handler
 const gracefulShutdown = async (signal) => {
@@ -67,13 +67,17 @@ const start = async () => {
     await prisma.$connect();
     logger.info('Database connected');
 
-    // Initialize Redis
+    // Initialize Redis (optional — falls back to in-memory cache)
     const redis = createRedisClient();
     if (redis) {
-      await redis.connect().catch(() => {
+      try {
+        await redis.connect();
+      } catch {
         logger.warn('Redis connection failed, using in-memory cache');
-      });
+      }
     }
+
+    const redisUp = isRedisAvailable();
 
     // Initialize cache service
     await cacheService.init();
@@ -84,9 +88,25 @@ const start = async () => {
     await ragService.seedReliableSources();
     logger.info('RAG service initialized');
 
-    // Start queue workers (if Redis available)
-    if (redis) {
+    // Start queue workers (only if Redis is connected)
+    if (redisUp) {
+      initQueues();
       startWorkers();
+
+      // Schedule periodic feed refresh every 30 minutes
+      setInterval(async () => {
+        try {
+          await queueFeedRefresh({ source: 'cron' });
+          logger.info('Scheduled feed refresh queued');
+        } catch (err) {
+          logger.error(`Scheduled feed refresh failed: ${err.message}`);
+        }
+      }, 30 * 60 * 1000); // 30 minutes
+
+      // Trigger initial feed refresh
+      queueFeedRefresh({ source: 'startup' }).catch(() => {});
+    } else {
+      logger.warn('Queues and workers skipped — Redis not available');
     }
 
     // Start HTTP server

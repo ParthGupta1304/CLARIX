@@ -291,11 +291,13 @@ class CredibilityService {
         badgeText: `${analysisResult.score}%`,
         badgeColor: scoreCategory.color,
         showOverlay: scoreCategory.category === 'flagged',
+        showWarning: scoreCategory.category === 'suspicious',
         overlayMessage: scoreCategory.category === 'flagged'
           ? 'This content has been flagged as potentially fake news by CLARIX.'
-          : scoreCategory.category === 'suspicious'
-            ? 'This content could not be fully verified. Proceed with caution.'
-            : null,
+          : null,
+        warningMessage: scoreCategory.category === 'suspicious'
+          ? 'This content could not be fully verified. Proceed with caution.'
+          : null,
       },
       
       // Analysis details

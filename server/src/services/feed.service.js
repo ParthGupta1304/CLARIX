@@ -170,7 +170,13 @@ class FeedService {
       });
 
       if (session?.preferences) {
-        return session.preferences;
+        try {
+          return typeof session.preferences === 'string'
+            ? JSON.parse(session.preferences)
+            : session.preferences;
+        } catch (e) {
+          // If parse fails, recalculate
+        }
       }
 
       // Calculate preferences from swipe history
@@ -206,7 +212,14 @@ class FeedService {
         categoryScores[item.category] = (categoryScores[item.category] || 0) + weight;
       }
 
-      for (const tag of item.tags || []) {
+      // Parse tags from JSON string (SQLite stores arrays as JSON strings)
+      let tags = [];
+      try {
+        tags = typeof item.tags === 'string' ? JSON.parse(item.tags) : (item.tags || []);
+      } catch (e) {
+        tags = [];
+      }
+      for (const tag of tags) {
         tagScores[tag] = (tagScores[tag] || 0) + weight;
       }
 
@@ -258,7 +271,7 @@ class FeedService {
     await prisma.userSession.update({
       where: { id: sessionId },
       data: {
-        preferences,
+        preferences: JSON.stringify(preferences),
         lastActiveAt: new Date(),
       },
     });
@@ -284,12 +297,16 @@ class FeedService {
       preferenceConditions.push({ category: { in: favoredCategories } });
     }
     
+    // Note: SQLite doesn't support hasSome for array fields.
+    // Tags are stored as JSON strings, so we use contains for basic matching.
     if (favoredTags.length > 0) {
-      preferenceConditions.push({ tags: { hasSome: favoredTags } });
+      for (const tag of favoredTags.slice(0, 5)) {
+        preferenceConditions.push({ tags: { contains: tag } });
+      }
     }
 
     const where = {
-      credibilityScore: { gte: 60 },
+      credibilityScore: { gte: config.scoring.feedMinScore },
       isVerified: true,
       OR: [
         { expiresAt: null },

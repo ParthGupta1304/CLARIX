@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { feedController } = require('../controllers');
-const { validate, feedQuerySchema, swipeFeedbackSchema } = require('../validators');
+const { requireSession } = require('../middleware');
+const { validate, feedQuerySchema } = require('../validators');
 
 /**
  * @route   GET /api/feed
@@ -26,7 +27,7 @@ router.get('/categories', feedController.getCategories);
  * @desc    Get user feed preferences
  * @access  Session required
  */
-router.get('/preferences', feedController.getPreferences);
+router.get('/preferences', requireSession, feedController.getPreferences);
 
 /**
  * @route   GET /api/feed/:itemId
