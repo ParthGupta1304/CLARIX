@@ -47,11 +47,18 @@ const config = {
     feedTtl: parseInt(process.env.CACHE_TTL_FEED, 10) || 300,
   },
 
-  // Scoring thresholds
+  // Scoring thresholds (CLARIX credibility bands)
   scoring: {
-    highCredibility: 70,
-    mediumCredibility: 40,
+    // 90-100: Authorized (trusted, blue badge)
+    authorizedThreshold: 90,
+    // 60-89: Suspicious/Unauthorized (flagged, red badge)
+    suspiciousThreshold: 60,
+    // Below 60: Removed/Blocked (overlay, strikethrough)
+    blockedThreshold: 60,
+    // Low confidence for breaking news
     lowConfidenceThreshold: 0.5,
+    // Feed minimum score (don't show below this)
+    feedMinScore: 60,
   },
 };
 

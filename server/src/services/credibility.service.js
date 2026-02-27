@@ -282,6 +282,20 @@ class CredibilityService {
         category: scoreCategory.category,
         color: scoreCategory.color,
         label: scoreCategory.label,
+        badge: scoreCategory.badge,
+      },
+      
+      // Browser extension overlay instructions
+      extension: {
+        action: scoreCategory.extensionAction,
+        badgeText: `${analysisResult.score}%`,
+        badgeColor: scoreCategory.color,
+        showOverlay: scoreCategory.category === 'flagged',
+        overlayMessage: scoreCategory.category === 'flagged'
+          ? 'This content has been flagged as potentially fake news by CLARIX.'
+          : scoreCategory.category === 'suspicious'
+            ? 'This content could not be fully verified. Proceed with caution.'
+            : null,
       },
       
       // Analysis details
@@ -317,19 +331,39 @@ class CredibilityService {
   }
 
   /**
-   * Get score category with color and label
+   * Get score category based on CLARIX credibility bands
+   * 90-100: AUTHORIZED   → Blue   → Trusted, verified news
+   * 60-89:  SUSPICIOUS   → Red    → Unverified, proceed with caution
+   * 0-59:   FLAGGED      → Block  → Likely fake, overlay/remove
    */
   getScoreCategory(score) {
-    if (score >= 80) {
-      return { category: 'high', color: '#22c55e', label: 'Highly Credible' };
+    if (score >= 90) {
+      return {
+        category: 'authorized',
+        color: '#3B82F6',         // Blue
+        label: 'Authorized',
+        badge: 'VERIFIED',
+        extensionAction: 'show_blue_badge',
+        feedVisible: true,
+      };
     } else if (score >= 60) {
-      return { category: 'good', color: '#84cc16', label: 'Generally Credible' };
-    } else if (score >= 40) {
-      return { category: 'mixed', color: '#eab308', label: 'Mixed Credibility' };
-    } else if (score >= 20) {
-      return { category: 'low', color: '#f97316', label: 'Low Credibility' };
+      return {
+        category: 'suspicious',
+        color: '#EF4444',         // Red
+        label: 'Suspicious',
+        badge: 'UNVERIFIED',
+        extensionAction: 'show_red_badge',
+        feedVisible: true,        // Shown in feed but marked red
+      };
     } else {
-      return { category: 'very-low', color: '#ef4444', label: 'Very Low Credibility' };
+      return {
+        category: 'flagged',
+        color: '#6B7280',         // Grey
+        label: 'Flagged as Fake',
+        badge: 'FAKE',
+        extensionAction: 'show_overlay',  // White overlay / strikethrough
+        feedVisible: false,       // NOT shown in feed
+      };
     }
   }
 

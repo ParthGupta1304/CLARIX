@@ -1,4 +1,5 @@
 const prisma = require('../lib/prisma');
+const config = require('../config');
 const logger = require('../utils/logger');
 const cacheService = require('./cache.service');
 
@@ -11,7 +12,7 @@ class FeedService {
       category = 'all',
       page = 1,
       limit = 20,
-      minScore = 60, // Only show credible content
+      minScore = config.scoring.feedMinScore, // Only show 60%+ (authorized + suspicious)
       sessionId = null,
     } = options;
 
@@ -344,6 +345,19 @@ class FeedService {
     } catch (e) {
       tags = [];
     }
+
+    // CLARIX feed card color logic
+    // 90-100%: Blue (authorized)  |  60-89%: Red (suspicious)  |  <60%: hidden
+    const score = item.credibilityScore;
+    let cardColor, cardLabel;
+    if (score >= 90) {
+      cardColor = '#3B82F6'; // Blue
+      cardLabel = 'Verified';
+    } else {
+      cardColor = '#EF4444'; // Red
+      cardLabel = 'Unverified';
+    }
+
     return {
       id: item.id,
       title: item.title,
@@ -352,8 +366,10 @@ class FeedService {
       sourceUrl: item.sourceUrl,
       sourceName: item.sourceName,
       credibility: {
-        score: item.credibilityScore,
-        verified: item.isVerified,
+        score,
+        verified: score >= 90,
+        cardColor,
+        cardLabel,
       },
       category: item.category,
       tags,
