@@ -11,13 +11,24 @@ import secrets
 import sys
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from engine.pipeline import run_pipeline
+from engine.deepfake_detector import (
+    load_model as load_deepfake_model,
+    predict_deepfake,
+    is_loaded as deepfake_is_loaded,
+)
 from schemas.request import VerifyRequest, PredictRequest
-from schemas.response import ErrorResponse, VerifyResponse, PredictResponse
+from schemas.response import (
+    ErrorResponse,
+    VerifyResponse,
+    PredictResponse,
+    DeepfakeResponse,
+    CombinedAnalysisResponse,
+)
 
 # ── Logging ────────────────────────────────────────────────────────────
 
@@ -103,6 +114,13 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
         _load_hf_model()
     except Exception as exc:
         logger.warning("HuggingFace model failed to load — /predict will be unavailable: %s", exc)
+
+    # Load deepfake detection model at startup
+    try:
+        load_deepfake_model()
+    except Exception as exc:
+        logger.warning("Deepfake model failed to load — /detect-deepfake will be unavailable: %s", exc)
+
     yield
     logger.info("Clarix pipeline shutting down.")
 
@@ -111,8 +129,8 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
 
 app = FastAPI(
     title="Clarix",
-    description="Evidence-based news verification engine — internal service for the Node.js backend.",
-    version="0.2.0",
+    description="Evidence-based news verification engine with deepfake image detection — internal service for the Node.js backend.",
+    version="0.3.0",
     lifespan=lifespan,
 )
 
@@ -135,8 +153,9 @@ async def health():
     return {
         "status": "ok",
         "engine": "clarix",
-        "version": "0.2.0",
+        "version": "0.3.0",
         "hf_model_loaded": _hf_model is not None,
+        "deepfake_model_loaded": deepfake_is_loaded(),
     }
 
 
@@ -180,6 +199,100 @@ async def verify(payload: VerifyRequest) -> VerifyResponse:
     except Exception as exc:
         logger.exception("Pipeline failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+# ── Deepfake detection ─────────────────────────────────────────────────
+
+@app.post(
+    "/detect-deepfake",
+    response_model=DeepfakeResponse,
+    responses={400: {"model": ErrorResponse}, 503: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    summary="Deepfake image detection via EfficientNet-B0",
+    description="Accepts an image upload and returns Deepfake/Real prediction "
+    "with confidence scores and probabilities.",
+)
+async def detect_deepfake(file: UploadFile = File(...)) -> DeepfakeResponse:
+    # Guard: model must be loaded
+    if not deepfake_is_loaded():
+        raise HTTPException(status_code=503, detail="Deepfake detection model not loaded")
+
+    # Validate content type
+    if file.content_type and not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail=f"Expected an image file, got {file.content_type}")
+
+    try:
+        image_bytes = await file.read()
+        if not image_bytes:
+            raise HTTPException(status_code=400, detail="Empty file uploaded")
+
+        result = predict_deepfake(image_bytes)
+        return DeepfakeResponse(**result)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Deepfake detection failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+# ── Combined analysis placeholder ──────────────────────────────────────
+
+@app.post(
+    "/analyze-combined",
+    response_model=CombinedAnalysisResponse,
+    summary="Combined text + image analysis (placeholder)",
+    description="Future endpoint that will combine text fake-news detection "
+    "and image deepfake detection into a single unified verdict.",
+)
+async def analyze_combined(
+    text: str | None = None,
+    file: UploadFile | None = File(default=None),
+) -> CombinedAnalysisResponse:
+    text_result = None
+    image_result = None
+
+    # Run text analysis if text provided
+    if text and _hf_model is not None and _hf_tokenizer is not None:
+        try:
+            raw = _predict_fake_news(text)
+            text_result = PredictResponse(**raw)
+        except Exception as exc:
+            logger.warning("Text analysis failed in combined endpoint: %s", exc)
+
+    # Run image analysis if image provided
+    if file and deepfake_is_loaded():
+        try:
+            image_bytes = await file.read()
+            if image_bytes:
+                raw = predict_deepfake(image_bytes)
+                image_result = DeepfakeResponse(**raw)
+        except Exception as exc:
+            logger.warning("Image analysis failed in combined endpoint: %s", exc)
+
+    # Simple combined verdict logic
+    verdicts = []
+    confidences = []
+    if text_result:
+        verdicts.append(text_result.label)
+        confidences.append(text_result.confidence)
+    if image_result:
+        verdicts.append(image_result.label)
+        confidences.append(image_result.confidence)
+
+    if verdicts:
+        combined_verdict = "suspicious" if any(v in ("FAKE", "Deepfake") for v in verdicts) else "likely_authentic"
+        combined_confidence = round(sum(confidences) / len(confidences), 2)
+    else:
+        combined_verdict = "no_input"
+        combined_confidence = 0.0
+
+    return CombinedAnalysisResponse(
+        text_analysis=text_result,
+        image_analysis=image_result,
+        combined_verdict=combined_verdict,
+        combined_confidence=combined_confidence,
+    )
 
 
 # ── Dev runner ─────────────────────────────────────────────────────────

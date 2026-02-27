@@ -93,3 +93,21 @@ class PredictResponse(BaseModel):
     confidence: float = Field(ge=0, le=100, description="Confidence % of the predicted label")
     real_probability: float = Field(ge=0, le=100, description="Probability % the text is real")
     fake_probability: float = Field(ge=0, le=100, description="Probability % the text is fake")
+
+
+class DeepfakeResponse(BaseModel):
+    """Output from the EfficientNet-B0 deepfake image detector."""
+
+    label: str = Field(description="Deepfake or Real")
+    confidence: float = Field(ge=0, le=100, description="Confidence % of the predicted label")
+    deepfake_probability: float = Field(ge=0, le=100, description="Probability % the image is a deepfake")
+    real_probability: float = Field(ge=0, le=100, description="Probability % the image is real")
+
+
+class CombinedAnalysisResponse(BaseModel):
+    """Placeholder for future combined text + image analysis."""
+
+    text_analysis: PredictResponse | None = Field(default=None, description="Text fake-news detection result")
+    image_analysis: DeepfakeResponse | None = Field(default=None, description="Image deepfake detection result")
+    combined_verdict: str = Field(default="pending", description="Overall combined verdict")
+    combined_confidence: float = Field(default=0.0, ge=0, le=100, description="Combined confidence score")
