@@ -35,7 +35,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { BGPattern } from "@/components/ui/bg-pattern";
+import MinimalHero from "@/components/ui/hero-minimalism";
+import { ScrollReveal } from "@/components/ui/scroll-reveal";
 
 /* ── Types ──────────────────────────────────────────────── */
 interface AnalysisResult {
@@ -286,19 +287,19 @@ export default function Home() {
 
   return (
     <div className="relative flex min-h-screen flex-col">
-      {/* ── Grid Background ──────────────────────────────── */}
-      <BGPattern variant="grid" mask="fade-edges" size={32} fill="#222222" />
-      {/* ── Header ───────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 border-b border-border bg-surface backdrop-blur-sm">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-6">
+      <MinimalHero />
+      
+      {/* ── Header Overlay ───────────────────────────────────────── */}
+      <header className="absolute top-0 w-full z-50">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-2 border border-border">
-              <Layers className="h-4 w-4 text-foreground" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface/40 border border-white/10 backdrop-blur-md">
+              <Layers className="h-4 w-4 text-white" />
             </div>
-            <span className="text-base font-bold tracking-tight">Clarix</span>
+            <span className="text-lg font-bold tracking-tight text-white drop-shadow-md">Clarix</span>
             <Badge
               variant="outline"
-              className="ml-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
+              className="ml-1 text-[9px] font-semibold uppercase tracking-widest text-white/80 border-white/20 bg-white/5"
             >
               Beta
             </Badge>
@@ -306,16 +307,16 @@ export default function Home() {
           <div className="flex items-center gap-2">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <Clock className="h-4 w-4" />
+                <Button variant="ghost" size="icon" className="h-9 w-9 text-white/80 hover:text-white hover:bg-white/10">
+                  <Clock className="h-4.5 w-4.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>History</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <Shield className="h-4 w-4" />
+                <Button variant="ghost" size="icon" className="h-9 w-9 text-white/80 hover:text-white hover:bg-white/10">
+                  <Shield className="h-4.5 w-4.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>About Clarix</TooltipContent>
@@ -324,23 +325,13 @@ export default function Home() {
         </div>
       </header>
 
-      {/* ── Main ─────────────────────────────────────────── */}
-      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-8 sm:px-6">
-        {/* Hero section */}
-        <section className="animate-fade-in text-center sm:text-left">
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            Verify anything, instantly.
-          </h1>
-          <p className="mt-2 max-w-lg text-sm text-muted-foreground leading-relaxed">
-            Paste a claim, drop an image, or scan a full web page — Clarix uses
-            AI to check the facts and rate credibility.
-          </p>
-        </section>
-
-        <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+      {/* ── Main Analyzer Section ────────────────────────────────── */}
+      <main id="analyzer-section" className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-20 sm:px-6 relative z-10">
+        <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
           {/* ── Left Column — Analyzer ───────────────────── */}
-          <div className="flex flex-col gap-6 animate-slide-up">
-            <Card className="border-border bg-card">
+          <div className="flex flex-col gap-6">
+            <ScrollReveal direction="up" delay={0}>
+            <Card className="border-border bg-card/80 backdrop-blur-md">
               <Tabs
                 value={activeTab}
                 onValueChange={(v) => {
@@ -561,10 +552,12 @@ export default function Home() {
                 </CardContent>
               </Tabs>
             </Card>
+            </ScrollReveal>
 
             {/* ── Result Panel ────────────────────────────── */}
             {result && (
-              <Card className="animate-slide-up border-border bg-card">
+              <ScrollReveal direction="up" delay={0.05}>
+              <Card className="border-border bg-card/80 backdrop-blur-md">
                 <CardHeader className="flex-row items-center justify-between space-y-0 pb-3">
                   <CardTitle className="text-base">Analysis Result</CardTitle>
                   <div className="flex gap-1">
@@ -652,40 +645,17 @@ export default function Home() {
                     </p>
                   </div>
 
-                  {/* Sources */}
-                  {result.sources.length > 0 && (
-                    <>
-                      <Separator />
-                      <div className="flex flex-col gap-2">
-                        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                          Sources
-                        </h3>
-                        <div className="flex flex-col gap-1.5">
-                          {result.sources.map((source, i) => (
-                            <a
-                              key={i}
-                              href={source.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-2 rounded-md border border-border bg-surface-2 px-3 py-2 text-sm transition-colors hover:bg-accent"
-                            >
-                              <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                              {source.title}
-                            </a>
-                          ))}
-                        </div>
-                      </div>
-                    </>
-                  )}
                 </CardContent>
               </Card>
+              </ScrollReveal>
             )}
           </div>
 
           {/* ── Right Column — Sidebar ───────────────────── */}
-          <div className="flex flex-col gap-6 animate-slide-up" style={{ animationDelay: "0.1s" }}>
+          <div className="flex flex-col gap-6">
             {/* Quick Stats */}
-            <Card className="border-border bg-card">
+            <ScrollReveal direction="right" delay={0.1}>
+            <Card className="border-border bg-card/80 backdrop-blur-md">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-sm">
                   <Sparkles className="h-4 w-4 text-pastel-yellow" />
@@ -719,9 +689,11 @@ export default function Home() {
                 </div>
               </CardContent>
             </Card>
+            </ScrollReveal>
 
             {/* Recent History */}
-            <Card className="border-border bg-card">
+            <ScrollReveal direction="right" delay={0.2}>
+            <Card className="border-border bg-card/80 backdrop-blur-md">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center justify-between text-sm">
                   <span className="flex items-center gap-2">
@@ -772,9 +744,11 @@ export default function Home() {
                 ))}
               </CardContent>
             </Card>
+            </ScrollReveal>
 
             {/* How it works */}
-            <Card className="border-border bg-card">
+            <ScrollReveal direction="right" delay={0.3}>
+            <Card className="border-border bg-card/80 backdrop-blur-md">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm">How it works</CardTitle>
               </CardHeader>
@@ -810,12 +784,13 @@ export default function Home() {
                 ))}
               </CardContent>
             </Card>
+            </ScrollReveal>
           </div>
         </div>
       </main>
 
       {/* ── Footer ───────────────────────────────────────── */}
-      <footer className="border-t border-border">
+      <footer className="border-t border-white/5 bg-background/60 backdrop-blur-sm">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
           <span className="text-xs text-muted-foreground">
             Clarix v1.0 · AI-Powered Fact Checking
