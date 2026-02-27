@@ -1,65 +1,851 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState, useRef, useCallback } from "react";
+import {
+  Layers,
+  FileText,
+  Image as ImageIcon,
+  Globe,
+  Search,
+  Upload,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  ExternalLink,
+  X,
+  Loader2,
+  Shield,
+  Sparkles,
+  Clock,
+  ArrowRight,
+  Copy,
+  RotateCcw,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { BGPattern } from "@/components/ui/bg-pattern";
+
+/* ── Types ──────────────────────────────────────────────── */
+interface AnalysisResult {
+  score: number;
+  verdict: "Credible" | "Uncertain" | "Misleading";
+  factCheck: number;
+  sourceCredibility: number;
+  sentimentBias: number;
+  explanation: string;
+  sources: { title: string; url: string }[];
+}
+
+/* ── Mock analysis ─────────────────────────────────────── */
+function mockAnalysis(): Promise<AnalysisResult> {
+  return new Promise((resolve) =>
+    setTimeout(
+      () =>
+        resolve({
+          score: 78,
+          verdict: "Uncertain",
+          factCheck: 82,
+          sourceCredibility: 71,
+          sentimentBias: 65,
+          explanation:
+            "The claim contains partially accurate information but lacks proper context. Several key details are either exaggerated or taken out of context from the original source material. The language used shows moderate emotional bias that may influence perception.",
+          sources: [
+            { title: "Reuters Fact Check", url: "https://reuters.com" },
+            { title: "AP News Analysis", url: "https://apnews.com" },
+            { title: "Snopes Verification", url: "https://snopes.com" },
+          ],
+        }),
+      2400
+    )
+  );
+}
+
+/* ── History item type ─────────────────────────────────── */
+interface HistoryItem {
+  id: number;
+  type: "text" | "image" | "page";
+  title: string;
+  score: number;
+  verdict: string;
+  time: string;
+}
+
+const recentHistory: HistoryItem[] = [
+  {
+    id: 1,
+    type: "text",
+    title: '"Scientists discover new species of deep-sea fish…"',
+    score: 91,
+    verdict: "Credible",
+    time: "2 min ago",
+  },
+  {
+    id: 2,
+    type: "image",
+    title: "Screenshot of viral tweet about climate data",
+    score: 45,
+    verdict: "Misleading",
+    time: "15 min ago",
+  },
+  {
+    id: 3,
+    type: "page",
+    title: "news-daily.com/breaking-story-2026",
+    score: 68,
+    verdict: "Uncertain",
+    time: "1 hr ago",
+  },
+];
+
+/* ── Helpers ────────────────────────────────────────────── */
+function getVerdictColor(verdict: string) {
+  switch (verdict) {
+    case "Credible":
+      return "text-pastel-green";
+    case "Misleading":
+      return "text-pastel-red";
+    default:
+      return "text-pastel-yellow";
+  }
+}
+
+function getVerdictBgClass(verdict: string) {
+  switch (verdict) {
+    case "Credible":
+      return "bg-pastel-green/15 text-pastel-green border-pastel-green/25";
+    case "Misleading":
+      return "bg-pastel-red/15 text-pastel-red border-pastel-red/25";
+    default:
+      return "bg-pastel-yellow/15 text-pastel-yellow border-pastel-yellow/25";
+  }
+}
+
+function getVerdictIcon(verdict: string) {
+  switch (verdict) {
+    case "Credible":
+      return <CheckCircle2 className="h-5 w-5 text-pastel-green" />;
+    case "Misleading":
+      return <XCircle className="h-5 w-5 text-pastel-red" />;
+    default:
+      return <AlertTriangle className="h-5 w-5 text-pastel-yellow" />;
+  }
+}
+
+function getScoreBarColor(score: number) {
+  if (score >= 70) return "bg-pastel-green";
+  if (score >= 45) return "bg-pastel-yellow";
+  return "bg-pastel-red";
+}
+
+function getTypeIcon(type: string) {
+  switch (type) {
+    case "text":
+      return <FileText className="h-3.5 w-3.5" />;
+    case "image":
+      return <ImageIcon className="h-3.5 w-3.5" />;
+    default:
+      return <Globe className="h-3.5 w-3.5" />;
+  }
+}
+
+/* ── ScoreRing Component ───────────────────────────────── */
+function ScoreRing({
+  score,
+  verdict,
+  size = 120,
+}: {
+  score: number;
+  verdict: string;
+  size?: number;
+}) {
+  const radius = (size - 16) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (score / 100) * circumference;
+  const strokeColor =
+    verdict === "Credible"
+      ? "var(--pastel-green)"
+      : verdict === "Misleading"
+        ? "var(--pastel-red)"
+        : "var(--pastel-yellow)";
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        className="-rotate-90"
+      >
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="var(--surface-2)"
+          strokeWidth="8"
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={strokeColor}
+          strokeWidth="8"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          className="transition-all duration-1000 ease-out"
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-3xl font-bold">{score}</span>
+        <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+          Trust
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/* ── BreakdownBar Component ────────────────────────────── */
+function BreakdownBar({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="w-32 shrink-0 text-sm text-muted-foreground">
+        {label}
+      </span>
+      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2">
+        <div
+          className={`h-full rounded-full transition-all duration-700 ease-out ${getScoreBarColor(value)}`}
+          style={{ width: `${value}%` }}
+        />
+      </div>
+      <span className="w-8 text-right text-sm font-semibold">{value}</span>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════
+   MAIN PAGE COMPONENT
+   ══════════════════════════════════════════════════════════ */
+export default function Home() {
+  const [textInput, setTextInput] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [activeTab, setActiveTab] = useState("text");
+  const [dragActive, setDragActive] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAnalyze = useCallback(async () => {
+    setIsAnalyzing(true);
+    setResult(null);
+    const res = await mockAnalysis();
+    setResult(res);
+    setIsAnalyzing(false);
+  }, []);
+
+  const handleReset = useCallback(() => {
+    setResult(null);
+    setTextInput("");
+    setImageUrl("");
+    setUploadedFileName(null);
+  }, []);
+
+  const handleFileDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragActive(false);
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith("image/")) {
+      setUploadedFileName(file.name);
+    }
+  }, []);
+
+  const handleFileSelect = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        setUploadedFileName(file.name);
+      }
+    },
+    []
+  );
+
+  return (
+    <div className="relative flex min-h-screen flex-col">
+      {/* ── Grid Background ──────────────────────────────── */}
+      <BGPattern variant="grid" mask="fade-edges" size={32} fill="#222222" />
+      {/* ── Header ───────────────────────────────────────── */}
+      <header className="sticky top-0 z-50 border-b border-border bg-surface backdrop-blur-sm">
+        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-6">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-2 border border-border">
+              <Layers className="h-4 w-4 text-foreground" />
+            </div>
+            <span className="text-base font-bold tracking-tight">Clarix</span>
+            <Badge
+              variant="outline"
+              className="ml-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              Beta
+            </Badge>
+          </div>
+          <div className="flex items-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Clock className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>History</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Shield className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>About Clarix</TooltipContent>
+            </Tooltip>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </header>
+
+      {/* ── Main ─────────────────────────────────────────── */}
+      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-8 sm:px-6">
+        {/* Hero section */}
+        <section className="animate-fade-in text-center sm:text-left">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+            Verify anything, instantly.
+          </h1>
+          <p className="mt-2 max-w-lg text-sm text-muted-foreground leading-relaxed">
+            Paste a claim, drop an image, or scan a full web page — Clarix uses
+            AI to check the facts and rate credibility.
+          </p>
+        </section>
+
+        <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+          {/* ── Left Column — Analyzer ───────────────────── */}
+          <div className="flex flex-col gap-6 animate-slide-up">
+            <Card className="border-border bg-card">
+              <Tabs
+                value={activeTab}
+                onValueChange={(v) => {
+                  setActiveTab(v);
+                  setResult(null);
+                }}
+              >
+                <CardHeader className="pb-0">
+                  <TabsList className="w-full bg-surface-2">
+                    <TabsTrigger
+                      value="text"
+                      className="flex-1 gap-1.5 text-xs data-[state=active]:bg-background"
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      Text / Claim
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="image"
+                      className="flex-1 gap-1.5 text-xs data-[state=active]:bg-background"
+                    >
+                      <ImageIcon className="h-3.5 w-3.5" />
+                      Image / Media
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="page"
+                      className="flex-1 gap-1.5 text-xs data-[state=active]:bg-background"
+                    >
+                      <Globe className="h-3.5 w-3.5" />
+                      Full Page
+                    </TabsTrigger>
+                  </TabsList>
+                </CardHeader>
+
+                <CardContent className="pt-5">
+                  {/* TEXT TAB */}
+                  <TabsContent value="text" className="mt-0 flex flex-col gap-4">
+                    <div>
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <label className="text-xs text-muted-foreground">
+                          Paste or type a claim to verify
+                        </label>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-6 gap-1 rounded-full px-2.5 text-[10px]"
+                          onClick={() =>
+                            navigator.clipboard.readText().then(setTextInput)
+                          }
+                        >
+                          <Copy className="h-3 w-3" />
+                          Paste
+                        </Button>
+                      </div>
+                      <Textarea
+                        id="textInput"
+                        placeholder="E.g. 'Scientists confirm chocolate cures cancer…'"
+                        rows={4}
+                        value={textInput}
+                        onChange={(e) => setTextInput(e.target.value)}
+                        className="resize-none bg-surface-2 border-border text-sm"
+                        maxLength={1000}
+                      />
+                      <p className="mt-1 text-right text-[10px] text-muted-foreground">
+                        {textInput.length} / 1000
+                      </p>
+                    </div>
+                    <Button
+                      id="analyzeTextBtn"
+                      className="w-full gap-2"
+                      disabled={!textInput.trim() || isAnalyzing}
+                      onClick={handleAnalyze}
+                    >
+                      {isAnalyzing ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Search className="h-4 w-4" />
+                      )}
+                      {isAnalyzing ? "Analyzing…" : "Analyze Claim"}
+                    </Button>
+                  </TabsContent>
+
+                  {/* IMAGE TAB */}
+                  <TabsContent
+                    value="image"
+                    className="mt-0 flex flex-col gap-4"
+                  >
+                    <div
+                      className={`group relative flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-8 text-center transition-colors cursor-pointer ${
+                        dragActive
+                          ? "border-foreground bg-surface-2"
+                          : "border-border hover:border-foreground/30 hover:bg-surface-2"
+                      }`}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setDragActive(true);
+                      }}
+                      onDragLeave={() => setDragActive(false)}
+                      onDrop={handleFileDrop}
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleFileSelect}
+                      />
+                      {uploadedFileName ? (
+                        <>
+                          <CheckCircle2 className="h-8 w-8 text-pastel-green" />
+                          <p className="text-sm font-medium">
+                            {uploadedFileName}
+                          </p>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs text-muted-foreground"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setUploadedFileName(null);
+                            }}
+                          >
+                            Remove
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-8 w-8 text-muted-foreground group-hover:text-foreground transition-colors" />
+                          <div>
+                            <p className="text-sm font-medium">
+                              Drop image here
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              or click to browse
+                            </p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                      <Separator className="flex-1" />
+                      <span>or enter image URL</span>
+                      <Separator className="flex-1" />
+                    </div>
+
+                    <Input
+                      id="imageUrlInput"
+                      type="url"
+                      placeholder="https://example.com/image.jpg"
+                      value={imageUrl}
+                      onChange={(e) => setImageUrl(e.target.value)}
+                      className="bg-surface-2 border-border text-sm"
+                    />
+
+                    <Button
+                      id="analyzeImageBtn"
+                      className="w-full gap-2"
+                      disabled={
+                        (!uploadedFileName && !imageUrl.trim()) || isAnalyzing
+                      }
+                      onClick={handleAnalyze}
+                    >
+                      {isAnalyzing ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Search className="h-4 w-4" />
+                      )}
+                      {isAnalyzing ? "Analyzing…" : "Analyze Image"}
+                    </Button>
+                  </TabsContent>
+
+                  {/* PAGE TAB */}
+                  <TabsContent
+                    value="page"
+                    className="mt-0 flex flex-col gap-4"
+                  >
+                    <Card className="border-border bg-surface-2">
+                      <CardContent className="flex items-center gap-3 py-3 px-4">
+                        <Globe className="h-5 w-5 shrink-0 text-muted-foreground" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">
+                            Current Page
+                          </p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            Enter a URL below or use the browser extension
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Input
+                      id="pageUrlInput"
+                      type="url"
+                      placeholder="https://example.com/article"
+                      className="bg-surface-2 border-border text-sm"
+                    />
+
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      Clarix will scan the article headlines, main content, and
+                      any embedded images for potential misinformation.
+                    </p>
+
+                    <Button
+                      id="analyzePageBtn"
+                      className="w-full gap-2"
+                      disabled={isAnalyzing}
+                      onClick={handleAnalyze}
+                    >
+                      {isAnalyzing ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Search className="h-4 w-4" />
+                      )}
+                      {isAnalyzing ? "Scanning…" : "Scan Full Page"}
+                    </Button>
+                  </TabsContent>
+                </CardContent>
+              </Tabs>
+            </Card>
+
+            {/* ── Result Panel ────────────────────────────── */}
+            {result && (
+              <Card className="animate-slide-up border-border bg-card">
+                <CardHeader className="flex-row items-center justify-between space-y-0 pb-3">
+                  <CardTitle className="text-base">Analysis Result</CardTitle>
+                  <div className="flex gap-1">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={handleReset}
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>New analysis</TooltipContent>
+                    </Tooltip>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => setResult(null)}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-5">
+                  {/* Score + Verdict */}
+                  <div className="flex items-center gap-5">
+                    <ScoreRing
+                      score={result.score}
+                      verdict={result.verdict}
+                      size={110}
+                    />
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        {getVerdictIcon(result.verdict)}
+                        <span className={`text-xl font-bold ${getVerdictColor(result.verdict)}`}>
+                          {result.verdict}
+                        </span>
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className={`w-fit text-xs ${getVerdictBgClass(result.verdict)}`}
+                      >
+                        {result.score >= 70
+                          ? "High Confidence"
+                          : result.score >= 45
+                            ? "Needs Review"
+                            : "Low Confidence"}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* Breakdown */}
+                  <div className="flex flex-col gap-3">
+                    <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Signal Breakdown
+                    </h3>
+                    <BreakdownBar
+                      label="Fact-Check"
+                      value={result.factCheck}
+                    />
+                    <BreakdownBar
+                      label="Source Credibility"
+                      value={result.sourceCredibility}
+                    />
+                    <BreakdownBar
+                      label="Sentiment / Bias"
+                      value={result.sentimentBias}
+                    />
+                  </div>
+
+                  <Separator />
+
+                  {/* Explanation */}
+                  <div className="flex flex-col gap-2">
+                    <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Why?
+                    </h3>
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      {result.explanation}
+                    </p>
+                  </div>
+
+                  {/* Sources */}
+                  {result.sources.length > 0 && (
+                    <>
+                      <Separator />
+                      <div className="flex flex-col gap-2">
+                        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          Sources
+                        </h3>
+                        <div className="flex flex-col gap-1.5">
+                          {result.sources.map((source, i) => (
+                            <a
+                              key={i}
+                              href={source.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 rounded-md border border-border bg-surface-2 px-3 py-2 text-sm transition-colors hover:bg-accent"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                              {source.title}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* ── Right Column — Sidebar ───────────────────── */}
+          <div className="flex flex-col gap-6 animate-slide-up" style={{ animationDelay: "0.1s" }}>
+            {/* Quick Stats */}
+            <Card className="border-border bg-card">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <Sparkles className="h-4 w-4 text-pastel-yellow" />
+                  Quick Stats
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg bg-surface-2 p-3 text-center">
+                  <p className="text-2xl font-bold">247</p>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Claims Checked
+                  </p>
+                </div>
+                <div className="rounded-lg bg-surface-2 p-3 text-center">
+                  <p className="text-2xl font-bold text-pastel-green">89%</p>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Accuracy Rate
+                  </p>
+                </div>
+                <div className="rounded-lg bg-surface-2 p-3 text-center">
+                  <p className="text-2xl font-bold">34</p>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Pages Scanned
+                  </p>
+                </div>
+                <div className="rounded-lg bg-surface-2 p-3 text-center">
+                  <p className="text-2xl font-bold text-pastel-red">12</p>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Flagged Items
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Recent History */}
+            <Card className="border-border bg-card">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-pastel-blue" />
+                    Recent Activity
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 gap-1 px-2 text-[10px] text-muted-foreground"
+                  >
+                    View all
+                    <ArrowRight className="h-3 w-3" />
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-2">
+                {recentHistory.map((item) => (
+                  <button
+                    key={item.id}
+                    className="flex items-start gap-3 rounded-lg border border-transparent p-2.5 text-left transition-colors hover:border-border hover:bg-surface-2"
+                  >
+                    <div className="mt-0.5 rounded-md bg-surface-2 p-1.5 text-muted-foreground">
+                      {getTypeIcon(item.type)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-medium">
+                        {item.title}
+                      </p>
+                      <div className="mt-1 flex items-center gap-2">
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] px-1.5 py-0 ${getVerdictBgClass(item.verdict)}`}
+                        >
+                          {item.verdict}
+                        </Badge>
+                        <span className="text-[10px] text-muted-foreground">
+                          {item.time}
+                        </span>
+                      </div>
+                    </div>
+                    <span
+                      className={`text-sm font-bold ${getVerdictColor(item.verdict)}`}
+                    >
+                      {item.score}
+                    </span>
+                  </button>
+                ))}
+              </CardContent>
+            </Card>
+
+            {/* How it works */}
+            <Card className="border-border bg-card">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">How it works</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-3">
+                {[
+                  {
+                    step: "1",
+                    title: "Submit Content",
+                    desc: "Paste text, upload an image, or enter a page URL",
+                  },
+                  {
+                    step: "2",
+                    title: "AI Analysis",
+                    desc: "Our model cross-references facts with trusted sources",
+                  },
+                  {
+                    step: "3",
+                    title: "Get Results",
+                    desc: "Receive a trust score with detailed breakdown",
+                  },
+                ].map((item) => (
+                  <div key={item.step} className="flex items-start gap-3">
+                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-2 text-xs font-bold text-muted-foreground">
+                      {item.step}
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium">{item.title}</p>
+                      <p className="text-[11px] leading-relaxed text-muted-foreground">
+                        {item.desc}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </main>
+
+      {/* ── Footer ───────────────────────────────────────── */}
+      <footer className="border-t border-border">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
+          <span className="text-xs text-muted-foreground">
+            Clarix v1.0 · AI-Powered Fact Checking
+          </span>
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <a href="#" className="transition-colors hover:text-foreground">
+              Report Issue
+            </a>
+            <span className="opacity-30">·</span>
+            <a href="#" className="transition-colors hover:text-foreground">
+              Privacy
+            </a>
+          </div>
+        </div>
+      </footer>
+
+      {/* ── Loading Overlay ──────────────────────────────── */}
+      {isAnalyzing && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/90 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-4 animate-fade-in">
+            <Loader2 className="h-10 w-10 animate-spin text-foreground" />
+            <div className="text-center">
+              <p className="text-sm font-semibold">Analyzing…</p>
+              <p className="text-xs text-muted-foreground">
+                This may take a few seconds
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
