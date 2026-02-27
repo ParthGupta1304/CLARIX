@@ -4,6 +4,45 @@ const prisma = require('../lib/prisma');
 const logger = require('../utils/logger');
 
 /**
+ * Unified analyze endpoint (used by extension & frontend)
+ * POST /api/analyze
+ * Body: { type: "text"|"image"|"page", content: string, url?: string }
+ */
+const analyze = async (req, res, next) => {
+  try {
+    const { type, content, url } = req.body;
+    const sessionId = req.sessionId || null;
+
+    if (!type || !content) {
+      return res.status(400).json({ success: false, error: 'Missing type or content' });
+    }
+
+    let result;
+
+    if (type === 'page' && url) {
+      // Try URL-based analysis first, fall back to text
+      try {
+        result = await credibilityService.analyzeUrl(url, sessionId);
+      } catch {
+        logger.info('URL parse failed, falling back to text analysis');
+        result = await credibilityService.analyzeText(content, sessionId);
+      }
+    } else {
+      // text or image (image text extracted by extension)
+      result = await credibilityService.analyzeText(content, sessionId);
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    logger.error(`Analyze error: ${error.message}`);
+    next(error);
+  }
+};
+
+/**
  * Analyze URL for credibility
  * POST /api/analyze/url
  */
@@ -102,34 +141,84 @@ const getAnalysis = async (req, res, next) => {
 /**
  * Get analysis history for session
  * GET /api/analyze/history
+ * Returns frontend-compatible HistoryItem[]
  */
 const getHistory = async (req, res, next) => {
   try {
     const sessionId = req.sessionId;
     const { page = 1, limit = 20 } = req.query;
 
-    const requests = await prisma.analysisRequest.findMany({
-      where: {
-        sessionId,
-        status: { in: ['COMPLETED', 'CACHED'] },
-      },
+    const results = await prisma.analysisResult.findMany({
+      where: sessionId
+        ? { article: { analysisResults: { some: {} } } }
+        : {},
       orderBy: { createdAt: 'desc' },
       skip: (parseInt(page) - 1) * parseInt(limit),
       take: parseInt(limit),
+      include: { article: true },
+    });
+
+    const items = results.map((r) => {
+      const verdictMap = (s) =>
+        s >= 70 ? 'Credible' : s >= 45 ? 'Uncertain' : 'Misleading';
+      return {
+        id: r.id,
+        type: r.article?.contentType?.toLowerCase() === 'news' ? 'page' : 'text',
+        title: r.article?.title || r.summary || 'Untitled Analysis',
+        score: r.score,
+        verdict: verdictMap(r.score),
+        time: r.createdAt.toISOString(),
+      };
     });
 
     return res.status(200).json({
       success: true,
       data: {
-        items: requests,
+        items,
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
+          total: items.length,
         },
       },
     });
   } catch (error) {
     logger.error(`Get history error: ${error.message}`);
+    next(error);
+  }
+};
+
+/**
+ * Get aggregate stats for Quick Stats sidebar
+ * GET /api/stats
+ */
+const getStats = async (req, res, next) => {
+  try {
+    const [analyses, flaggedCount, articleCount] = await Promise.all([
+      prisma.analysisResult.aggregate({
+        _sum: { factualClaims: true, verifiedClaims: true },
+        _count: true,
+      }),
+      prisma.analysisResult.count({ where: { score: { lt: 60 } } }),
+      prisma.article.count(),
+    ]);
+
+    const totalClaims = analyses._sum.factualClaims || 0;
+    const verifiedClaims = analyses._sum.verifiedClaims || 0;
+    const accuracyRate =
+      totalClaims > 0 ? Math.round((verifiedClaims / totalClaims) * 100) : 0;
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        claimsChecked: totalClaims,
+        accuracyRate,
+        pagesScanned: articleCount,
+        flaggedItems: flaggedCount,
+      },
+    });
+  } catch (error) {
+    logger.error(`Stats error: ${error.message}`);
     next(error);
   }
 };
@@ -245,10 +334,12 @@ const getAnalysisStatus = async (req, res, next) => {
 };
 
 module.exports = {
+  analyze,
   analyzeUrl,
   analyzeText,
   getAnalysis,
   getHistory,
+  getStats,
   asyncAnalyzeUrl,
   getAnalysisStatus,
 };

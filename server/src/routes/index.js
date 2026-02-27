@@ -25,4 +25,8 @@ router.use('/feedback', feedbackRoutes);
 router.use('/session', sessionRoutes);
 router.use('/admin', requireAuth, adminRoutes);
 
+// Public stats endpoint for Quick Stats sidebar
+const { analyzeController } = require('../controllers');
+router.get('/stats', analyzeController.getStats);
+
 module.exports = router;

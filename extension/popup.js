@@ -8,7 +8,7 @@
 // ─────────────────────────────────────────────────────────
 //  Constants
 // ─────────────────────────────────────────────────────────
-const API_BASE = 'http://localhost:3000'; // Next.js dev server
+const API_BASE = 'http://localhost:3000'; // Express backend server
 
 // ─────────────────────────────────────────────────────────
 //  DOM Refs
@@ -187,14 +187,22 @@ async function runAnalysis({ type, content, url }) {
   try {
     const response = await fetch(`${API_BASE}/api/analyze`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-api-key': 'clarix-public-api-key-change-in-production' },
       body: JSON.stringify({ type, content, url }),
     });
 
     if (!response.ok) throw new Error(`Server error: ${response.status}`);
-    const data = await response.json();
+    const json = await response.json();
+    const d = json.data || json;
+    // Map backend shape to extension-compatible shape
+    const mapped = {
+      trustScore: d.trustScore ?? d.score ?? 0,
+      verdict: d.verdictDetail ?? { icon: '⚠️', text: d.verdict || 'Unknown', explanation: d.explanation || '' },
+      breakdown: d.breakdown ?? { factCheck: d.factCheck ?? 0, sourceCredibility: d.sourceCredibility ?? 0, sentiment: d.sentimentBias ?? 0 },
+      sources: d.sources ?? [],
+    };
     hideLoading();
-    renderResults(data);
+    renderResults(mapped);
   } catch (err) {
     hideLoading();
     // Show simulated results if API is not available (for offline demo)

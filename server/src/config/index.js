@@ -28,11 +28,10 @@ const config = {
     model: process.env.OPENAI_MODEL || 'gpt-4-turbo-preview',
   },
 
-  // Vector Database
-  vectorDb: {
-    apiKey: process.env.VECTOR_DB_API_KEY,
-    environment: process.env.VECTOR_DB_ENVIRONMENT,
-    index: process.env.VECTOR_DB_INDEX || 'clarix-embeddings',
+  // Supabase (pgvector)
+  supabase: {
+    supabaseUrl: process.env.SUPABASE_URL,
+    supabaseServiceKey: process.env.SUPABASE_SERVICE_KEY,
   },
 
   // Rate Limiting

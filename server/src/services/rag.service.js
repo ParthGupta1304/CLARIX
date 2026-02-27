@@ -1,45 +1,72 @@
+const { createClient } = require('@supabase/supabase-js');
 const config = require('../config');
 const logger = require('../utils/logger');
 const llmService = require('./llm.service');
 
 /**
  * RAG (Retrieval-Augmented Generation) Service
- * Handles vector database operations for retrieving relevant context
+ * Uses Supabase pgvector for vector similarity search.
+ *
+ * Prerequisites — run once in the Supabase SQL Editor:
+ *   See server/supabase/setup.sql
  */
 class RAGService {
   constructor() {
-    // In production, this would connect to Pinecone, Weaviate, or similar
-    this.vectorStore = new Map(); // In-memory fallback
+    this.supabase = null;
     this.initialized = false;
   }
 
   async init() {
     try {
-      // Initialize vector DB connection
-      // For MVP, using in-memory storage
-      // In production: connect to Pinecone/Weaviate/Qdrant
-      logger.info('RAG Service initialized (in-memory mode)');
+      const { supabaseUrl, supabaseServiceKey } = config.supabase;
+
+      if (!supabaseUrl || !supabaseServiceKey) {
+        logger.warn('RAG Service: SUPABASE_URL or SUPABASE_SERVICE_KEY missing — running in disabled mode');
+        return;
+      }
+
+      this.supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+      // Quick connectivity check
+      const { error } = await this.supabase.from('documents').select('id').limit(1);
+      if (error && !error.message.includes('does not exist')) {
+        logger.warn(`RAG Service: Supabase query test returned error: ${error.message}`);
+      }
+
       this.initialized = true;
+      logger.info('RAG Service initialized (Supabase pgvector)');
     } catch (error) {
       logger.error(`RAG Service init error: ${error.message}`);
     }
   }
 
+  // ─── Store ────────────────────────────────────────────────────────────
+
   /**
-   * Store document embedding for future retrieval
+   * Store a document embedding in Supabase for future retrieval.
+   * Uses upsert on `doc_id` so seeds are idempotent.
    */
   async storeDocument(docId, text, metadata = {}) {
+    if (!this.initialized) return false;
+
     try {
       const embedding = await llmService.generateEmbedding(text);
       if (!embedding) return false;
 
-      this.vectorStore.set(docId, {
-        embedding,
-        text: text.substring(0, 2000),
-        metadata,
-        createdAt: new Date(),
-      });
+      const { error } = await this.supabase.from('documents').upsert(
+        {
+          doc_id: docId,
+          content: text.substring(0, 2000),
+          metadata,
+          embedding,
+        },
+        { onConflict: 'doc_id' }
+      );
 
+      if (error) {
+        logger.error(`RAG store error (Supabase): ${error.message}`);
+        return false;
+      }
       return true;
     } catch (error) {
       logger.error(`RAG store error: ${error.message}`);
@@ -47,31 +74,36 @@ class RAGService {
     }
   }
 
+  // ─── Retrieve ─────────────────────────────────────────────────────────
+
   /**
-   * Retrieve relevant documents for a query
+   * Similarity search via the `match_documents` Postgres function.
    */
-  async retrieve(query, topK = 5) {
+  async retrieve(query, topK = 5, similarityThreshold = 0.7) {
+    if (!this.initialized) return [];
+
     try {
       const queryEmbedding = await llmService.generateEmbedding(query);
       if (!queryEmbedding) return [];
 
-      const results = [];
-      
-      // Calculate cosine similarity with all stored documents
-      for (const [docId, doc] of this.vectorStore) {
-        const similarity = this.cosineSimilarity(queryEmbedding, doc.embedding);
-        results.push({
-          docId,
-          text: doc.text,
-          source: doc.metadata.source || 'Unknown',
-          similarity,
-          metadata: doc.metadata,
-        });
+      const { data, error } = await this.supabase.rpc('match_documents', {
+        query_embedding: queryEmbedding,
+        match_threshold: similarityThreshold,
+        match_count: topK,
+      });
+
+      if (error) {
+        logger.error(`RAG retrieve error (Supabase RPC): ${error.message}`);
+        return [];
       }
 
-      // Sort by similarity and return top K
-      results.sort((a, b) => b.similarity - a.similarity);
-      return results.slice(0, topK).filter(r => r.similarity > 0.7);
+      return (data || []).map((row) => ({
+        docId: row.doc_id,
+        text: row.content,
+        source: row.metadata?.source || 'Unknown',
+        similarity: row.similarity,
+        metadata: row.metadata,
+      }));
     } catch (error) {
       logger.error(`RAG retrieve error: ${error.message}`);
       return [];
@@ -79,12 +111,14 @@ class RAGService {
   }
 
   /**
-   * Retrieve context relevant to claims
+   * Retrieve context relevant to a set of claims.
    */
   async retrieveForClaims(claims) {
+    if (!this.initialized) return [];
+
     try {
       const allResults = [];
-      
+
       for (const claim of claims) {
         const claimText = claim.text || claim;
         const results = await this.retrieve(claimText, 3);
@@ -93,7 +127,7 @@ class RAGService {
 
       // Deduplicate by docId
       const seen = new Set();
-      return allResults.filter(r => {
+      return allResults.filter((r) => {
         if (seen.has(r.docId)) return false;
         seen.add(r.docId);
         return true;
@@ -104,30 +138,17 @@ class RAGService {
     }
   }
 
-  /**
-   * Calculate cosine similarity between two vectors
-   */
-  cosineSimilarity(vecA, vecB) {
-    if (!vecA || !vecB || vecA.length !== vecB.length) return 0;
-
-    let dotProduct = 0;
-    let normA = 0;
-    let normB = 0;
-
-    for (let i = 0; i < vecA.length; i++) {
-      dotProduct += vecA[i] * vecB[i];
-      normA += vecA[i] * vecA[i];
-      normB += vecB[i] * vecB[i];
-    }
-
-    if (normA === 0 || normB === 0) return 0;
-    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-  }
+  // ─── Seed ─────────────────────────────────────────────────────────────
 
   /**
-   * Seed with known reliable sources (for MVP)
+   * Seed known reliable-source descriptions (idempotent via upsert).
    */
   async seedReliableSources() {
+    if (!this.initialized) {
+      logger.info('RAG seed skipped — service not initialized');
+      return;
+    }
+
     const reliableSources = [
       {
         id: 'reuters-about',
@@ -154,10 +175,12 @@ class RAGService {
   }
 
   /**
-   * Clear all stored documents
+   * Delete all rows (useful for dev reset).
    */
-  clear() {
-    this.vectorStore.clear();
+  async clear() {
+    if (!this.initialized) return;
+    const { error } = await this.supabase.from('documents').delete().neq('id', 0);
+    if (error) logger.error(`RAG clear error: ${error.message}`);
   }
 }
 

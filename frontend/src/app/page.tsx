@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
 import {
   Layers,
   FileText,
@@ -49,33 +51,76 @@ interface AnalysisResult {
   sources: { title: string; url: string }[];
 }
 
-/* ── Mock analysis ─────────────────────────────────────── */
-function mockAnalysis(): Promise<AnalysisResult> {
-  return new Promise((resolve) =>
-    setTimeout(
-      () =>
-        resolve({
-          score: 78,
-          verdict: "Uncertain",
-          factCheck: 82,
-          sourceCredibility: 71,
-          sentimentBias: 65,
-          explanation:
-            "The claim contains partially accurate information but lacks proper context. Several key details are either exaggerated or taken out of context from the original source material. The language used shows moderate emotional bias that may influence perception.",
-          sources: [
-            { title: "Reuters Fact Check", url: "https://reuters.com" },
-            { title: "AP News Analysis", url: "https://apnews.com" },
-            { title: "Snopes Verification", url: "https://snopes.com" },
-          ],
-        }),
-      2400
-    )
-  );
+/* ── API helpers ────────────────────────────────────────── */
+async function analyzeContent(
+  type: "text" | "image" | "page",
+  content: string,
+  url?: string
+): Promise<AnalysisResult> {
+  const res = await fetch(`${API_BASE}/analyze`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-api-key": "clarix-public-api-key-change-in-production" },
+    body: JSON.stringify({ type, content, url }),
+  });
+  if (!res.ok) throw new Error("Analysis failed");
+  const json = await res.json();
+  const d = json.data;
+  return {
+    score: d.score ?? d.credibility?.score ?? 0,
+    verdict: d.verdict ?? "Uncertain",
+    factCheck: d.factCheck ?? 0,
+    sourceCredibility: d.sourceCredibility ?? 0,
+    sentimentBias: d.sentimentBias ?? 0,
+    explanation: d.explanation ?? d.analysis?.explanation ?? "",
+    sources: d.sources ?? [],
+  };
+}
+
+async function fetchStats(): Promise<{
+  claimsChecked: number;
+  accuracyRate: number;
+  pagesScanned: number;
+  flaggedItems: number;
+}> {
+  try {
+    const res = await fetch(`${API_BASE}/stats`);
+    if (!res.ok) throw new Error();
+    const json = await res.json();
+    return json.data;
+  } catch {
+    return { claimsChecked: 0, accuracyRate: 0, pagesScanned: 0, flaggedItems: 0 };
+  }
+}
+
+async function fetchHistory(): Promise<HistoryItem[]> {
+  try {
+    const res = await fetch(`${API_BASE}/analyze/history`, {
+      headers: { "x-api-key": "clarix-public-api-key-change-in-production" },
+    });
+    if (!res.ok) throw new Error();
+    const json = await res.json();
+    return (json.data?.items ?? []).map((h: HistoryItem) => ({
+      ...h,
+      time: formatRelativeTime(h.time),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+function formatRelativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hr ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
 }
 
 /* ── History item type ─────────────────────────────────── */
 interface HistoryItem {
-  id: number;
+  id: number | string;
   type: "text" | "image" | "page";
   title: string;
   score: number;
@@ -83,32 +128,12 @@ interface HistoryItem {
   time: string;
 }
 
-const recentHistory: HistoryItem[] = [
-  {
-    id: 1,
-    type: "text",
-    title: '"Scientists discover new species of deep-sea fish…"',
-    score: 91,
-    verdict: "Credible",
-    time: "2 min ago",
-  },
-  {
-    id: 2,
-    type: "image",
-    title: "Screenshot of viral tweet about climate data",
-    score: 45,
-    verdict: "Misleading",
-    time: "15 min ago",
-  },
-  {
-    id: 3,
-    type: "page",
-    title: "news-daily.com/breaking-story-2026",
-    score: 68,
-    verdict: "Uncertain",
-    time: "1 hr ago",
-  },
-];
+interface QuickStats {
+  claimsChecked: number;
+  accuracyRate: number;
+  pagesScanned: number;
+  flaggedItems: number;
+}
 
 /* ── Helpers ────────────────────────────────────────────── */
 function getVerdictColor(verdict: string) {
@@ -244,20 +269,48 @@ function BreakdownBar({ label, value }: { label: string; value: number }) {
 export default function Home() {
   const [textInput, setTextInput] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [pageUrl, setPageUrl] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [activeTab, setActiveTab] = useState("text");
   const [dragActive, setDragActive] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [stats, setStats] = useState<QuickStats>({ claimsChecked: 0, accuracyRate: 0, pagesScanned: 0, flaggedItems: 0 });
+  const [recentHistory, setRecentHistory] = useState<HistoryItem[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch stats and history on mount
+  useEffect(() => {
+    fetchStats().then(setStats);
+    fetchHistory().then(setRecentHistory);
+  }, []);
+
+  // Refresh stats and history after analysis
+  const refreshSidebar = useCallback(() => {
+    fetchStats().then(setStats);
+    fetchHistory().then(setRecentHistory);
+  }, []);
 
   const handleAnalyze = useCallback(async () => {
     setIsAnalyzing(true);
     setResult(null);
-    const res = await mockAnalysis();
-    setResult(res);
-    setIsAnalyzing(false);
-  }, []);
+    try {
+      let res: AnalysisResult;
+      if (activeTab === "text") {
+        res = await analyzeContent("text", textInput);
+      } else if (activeTab === "image") {
+        res = await analyzeContent("image", imageUrl || uploadedFileName || "");
+      } else {
+        res = await analyzeContent("page", pageUrl, pageUrl);
+      }
+      setResult(res);
+      refreshSidebar();
+    } catch (err) {
+      console.error("Analysis failed:", err);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [activeTab, textInput, imageUrl, uploadedFileName, pageUrl, refreshSidebar]);
 
   const handleReset = useCallback(() => {
     setResult(null);
@@ -527,6 +580,8 @@ export default function Home() {
                       id="pageUrlInput"
                       type="url"
                       placeholder="https://example.com/article"
+                      value={pageUrl}
+                      onChange={(e) => setPageUrl(e.target.value)}
                       className="bg-surface-2 border-border text-sm"
                     />
 
@@ -664,25 +719,25 @@ export default function Home() {
               </CardHeader>
               <CardContent className="grid grid-cols-2 gap-3">
                 <div className="rounded-lg bg-surface-2 p-3 text-center">
-                  <p className="text-2xl font-bold">247</p>
+                  <p className="text-2xl font-bold">{stats.claimsChecked}</p>
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
                     Claims Checked
                   </p>
                 </div>
                 <div className="rounded-lg bg-surface-2 p-3 text-center">
-                  <p className="text-2xl font-bold text-pastel-green">89%</p>
+                  <p className="text-2xl font-bold text-pastel-green">{stats.accuracyRate}%</p>
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
                     Accuracy Rate
                   </p>
                 </div>
                 <div className="rounded-lg bg-surface-2 p-3 text-center">
-                  <p className="text-2xl font-bold">34</p>
+                  <p className="text-2xl font-bold">{stats.pagesScanned}</p>
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
                     Pages Scanned
                   </p>
                 </div>
                 <div className="rounded-lg bg-surface-2 p-3 text-center">
-                  <p className="text-2xl font-bold text-pastel-red">12</p>
+                  <p className="text-2xl font-bold text-pastel-red">{stats.flaggedItems}</p>
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
                     Flagged Items
                   </p>
@@ -711,7 +766,12 @@ export default function Home() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col gap-2">
-                {recentHistory.map((item) => (
+                {recentHistory.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-4">
+                    No analyses yet. Try analyzing some content!
+                  </p>
+                ) : (
+                recentHistory.map((item) => (
                   <button
                     key={item.id}
                     className="flex items-start gap-3 rounded-lg border border-transparent p-2.5 text-left transition-colors hover:border-border hover:bg-surface-2"
@@ -741,8 +801,7 @@ export default function Home() {
                       {item.score}
                     </span>
                   </button>
-                ))}
-              </CardContent>
+                ))}                )}              </CardContent>
             </Card>
             </ScrollReveal>
 

@@ -74,17 +74,25 @@ Analyze the provided article and assess its credibility based on:
 
 Return a JSON object with:
 {
-  "score": <number 0-100>,
+  "score": <number 0-100, overall trust score>,
   "confidence": <number 0-1>,
   "explanation": "<detailed explanation of the score>",
   "summary": "<2-3 sentence summary of findings>",
+  "breakdown": {
+    "factCheck": <number 0-100, how well the factual claims hold up>,
+    "sourceCredibility": <number 0-100, trustworthiness of the source/author>,
+    "sentimentBias": <number 0-100, 100 = perfectly neutral, 0 = extremely biased/sensational>
+  },
   "signals": {
     "positive": ["<list of positive credibility signals>"],
     "negative": ["<list of negative credibility signals>"]
   },
   "sourceQuality": <number 0-1>,
   "biasIndicator": "LEFT|CENTER-LEFT|CENTER|CENTER-RIGHT|RIGHT|UNKNOWN",
-  "recommendations": ["<suggestions for readers>"]
+  "recommendations": ["<suggestions for readers>"],
+  "referenceSources": [
+    { "title": "<source name for cross-reference>", "url": "<URL if known, otherwise empty string>" }
+  ]
 }
 
 Scoring guidelines (CLARIX credibility bands):
@@ -96,7 +104,9 @@ Scoring guidelines (CLARIX credibility bands):
 
 IMPORTANT: Only assign 90+ to articles with strong sourcing, verified facts, and professional journalism standards. 
 60-89 should be the default range for news with some but not full verification.
-Below 60 should be reserved for clearly problematic content.`;
+Below 60 should be reserved for clearly problematic content.
+
+For "referenceSources", include 1-5 well-known fact-checking or news sources that could be used to cross-reference the claims (e.g. Reuters Fact Check, AP News, Snopes, PolitiFact, BBC, etc.). Include actual URLs when possible.`;
 
     const claimsSummary = claims.length > 0 
       ? `\n\nExtracted Claims:\n${claims.map((c, i) => `${i + 1}. ${c.text}`).join('\n')}`

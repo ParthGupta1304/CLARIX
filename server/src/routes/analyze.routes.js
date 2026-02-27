@@ -5,6 +5,18 @@ const { requireAuth, requireSession, analysisLimiter } = require('../middleware'
 const { validate, analyzeUrlSchema, analyzeTextSchema } = require('../validators');
 
 /**
+ * @route   POST /api/analyze
+ * @desc    Unified analyze endpoint (extension + frontend)
+ * @access  Requires API key or session
+ */
+router.post(
+  '/',
+  analysisLimiter,
+  requireAuth,
+  analyzeController.analyze
+);
+
+/**
  * @route   POST /api/analyze/url
  * @desc    Analyze URL for credibility
  * @access  Requires API key or session

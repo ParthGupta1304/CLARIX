@@ -170,13 +170,7 @@ class FeedService {
       });
 
       if (session?.preferences) {
-        try {
-          return typeof session.preferences === 'string'
-            ? JSON.parse(session.preferences)
-            : session.preferences;
-        } catch (e) {
-          // If parse fails, recalculate
-        }
+        return session.preferences;
       }
 
       // Calculate preferences from swipe history
@@ -212,13 +206,7 @@ class FeedService {
         categoryScores[item.category] = (categoryScores[item.category] || 0) + weight;
       }
 
-      // Parse tags from JSON string (SQLite stores arrays as JSON strings)
-      let tags = [];
-      try {
-        tags = typeof item.tags === 'string' ? JSON.parse(item.tags) : (item.tags || []);
-      } catch (e) {
-        tags = [];
-      }
+      const tags = item.tags || [];
       for (const tag of tags) {
         tagScores[tag] = (tagScores[tag] || 0) + weight;
       }
@@ -271,7 +259,7 @@ class FeedService {
     await prisma.userSession.update({
       where: { id: sessionId },
       data: {
-        preferences: JSON.stringify(preferences),
+        preferences,
         lastActiveAt: new Date(),
       },
     });
@@ -297,12 +285,8 @@ class FeedService {
       preferenceConditions.push({ category: { in: favoredCategories } });
     }
     
-    // Note: SQLite doesn't support hasSome for array fields.
-    // Tags are stored as JSON strings, so we use contains for basic matching.
     if (favoredTags.length > 0) {
-      for (const tag of favoredTags.slice(0, 5)) {
-        preferenceConditions.push({ tags: { contains: tag } });
-      }
+      preferenceConditions.push({ tags: { hasSome: favoredTags.slice(0, 5) } });
     }
 
     const where = {
@@ -356,12 +340,7 @@ class FeedService {
    * Format feed item for response
    */
   formatFeedItem(item) {
-    let tags = [];
-    try {
-      tags = typeof item.tags === 'string' ? JSON.parse(item.tags) : (item.tags || []);
-    } catch (e) {
-      tags = [];
-    }
+    const tags = item.tags || [];
 
     // CLARIX feed card color logic
     // 90-100%: Blue (authorized)  |  60-89%: Red (suspicious)  |  <60%: hidden
@@ -407,7 +386,7 @@ class FeedService {
         sourceName: data.sourceName,
         credibilityScore: data.credibilityScore,
         category: data.category,
-        tags: typeof data.tags === 'string' ? data.tags : JSON.stringify(data.tags || []),
+        tags: data.tags || [],
         isVerified: data.isVerified ?? true,
         publishedAt: data.publishedAt || new Date(),
         expiresAt: data.expiresAt,

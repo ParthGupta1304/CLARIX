@@ -167,6 +167,10 @@ class CredibilityService {
         verifiedClaims: verifiedCount,
         sourceQuality: credibilityResult.sourceQuality,
         biasIndicator: credibilityResult.biasIndicator,
+        factCheckScore: credibilityResult.breakdown?.factCheck ?? null,
+        sourceCredScore: credibilityResult.breakdown?.sourceCredibility ?? null,
+        sentimentScore: credibilityResult.breakdown?.sentimentBias ?? null,
+        referenceSources: credibilityResult.referenceSources || [],
         modelVersion: credibilityResult.modelVersion,
         processingTime: credibilityResult.processingTime,
       },
@@ -197,7 +201,7 @@ class CredibilityService {
           verificationStatus: verification.status || 'PENDING',
           confidence: verification.confidence || 0,
           evidence: verification.evidence || null,
-          sources: JSON.stringify(verification.sources || []),
+          sources: verification.sources || [],
         },
       });
 
@@ -261,9 +265,24 @@ class CredibilityService {
 
   /**
    * Format the final analysis result
+   * Produces a shape consumed by:
+   *   - Frontend (page.tsx)  → score, verdict, factCheck, sourceCredibility, sentimentBias, explanation, sources
+   *   - Extension (popup.js) → trustScore, verdict{icon,text,explanation}, breakdown, sources
+   *   - Internal / admin     → full credibility, extension, claims, meta blocks
    */
   formatAnalysisResult(article, analysisResult, claims = [], credibilityDetails = {}) {
     const scoreCategory = this.getScoreCategory(analysisResult.score);
+    const verdict = this.mapVerdict(analysisResult.score);
+
+    // Breakdown scores (from DB columns, fall back to credibilityDetails from LLM)
+    const factCheck        = analysisResult.factCheckScore  ?? credibilityDetails.breakdown?.factCheck ?? Math.round((analysisResult.sourceQuality || 0.5) * 100);
+    const sourceCredibility = analysisResult.sourceCredScore ?? credibilityDetails.breakdown?.sourceCredibility ?? Math.round((analysisResult.sourceQuality || 0.5) * 100);
+    const sentimentBias    = analysisResult.sentimentScore   ?? credibilityDetails.breakdown?.sentimentBias ?? 50;
+
+    // Reference sources
+    const sources = analysisResult.referenceSources
+      || credibilityDetails.referenceSources
+      || [];
 
     return {
       resultId: analysisResult.id,
@@ -274,8 +293,26 @@ class CredibilityService {
       author: article.author,
       publishedAt: article.publishedAt,
       contentType: article.contentType,
-      
-      // Credibility scoring
+
+      // ── Frontend-compatible top-level fields ──────────────
+      score: analysisResult.score,
+      verdict: verdict.label,                         // "Credible" | "Uncertain" | "Misleading"
+      factCheck,
+      sourceCredibility,
+      sentimentBias,
+      explanation: analysisResult.explanation,
+      sources,                                        // [{ title, url }]
+
+      // ── Extension-compatible block ────────────────────────
+      trustScore: analysisResult.score,
+      verdictDetail: {
+        icon: verdict.icon,
+        text: verdict.text,
+        explanation: analysisResult.explanation,
+      },
+      breakdown: { factCheck, sourceCredibility, sentiment: sentimentBias },
+
+      // ── Full credibility object (dashboard / admin) ───────
       credibility: {
         score: analysisResult.score,
         confidence: analysisResult.confidence,
@@ -284,8 +321,8 @@ class CredibilityService {
         label: scoreCategory.label,
         badge: scoreCategory.badge,
       },
-      
-      // Browser extension overlay instructions
+
+      // ── Browser extension overlay instructions ────────────
       extension: {
         action: scoreCategory.extensionAction,
         badgeText: `${analysisResult.score}%`,
@@ -299,8 +336,8 @@ class CredibilityService {
           ? 'This content could not be fully verified. Proceed with caution.'
           : null,
       },
-      
-      // Analysis details
+
+      // ── Analysis details ──────────────────────────────────
       analysis: {
         explanation: analysisResult.explanation,
         summary: analysisResult.summary,
@@ -309,8 +346,8 @@ class CredibilityService {
         signals: credibilityDetails.signals || { positive: [], negative: [] },
         recommendations: credibilityDetails.recommendations || [],
       },
-      
-      // Claims
+
+      // ── Claims ────────────────────────────────────────────
       claims: {
         total: analysisResult.factualClaims,
         verified: analysisResult.verifiedClaims,
@@ -322,14 +359,28 @@ class CredibilityService {
           confidence: c.confidence,
         })),
       },
-      
-      // Meta
+
+      // ── Meta ──────────────────────────────────────────────
       meta: {
         modelVersion: analysisResult.modelVersion,
         processingTime: analysisResult.processingTime,
         analyzedAt: analysisResult.createdAt,
       },
     };
+  }
+
+  /**
+   * Map score → frontend verdict ("Credible" / "Uncertain" / "Misleading")
+   * and extension verdict (icon + short text)
+   */
+  mapVerdict(score) {
+    if (score >= 70) {
+      return { label: 'Credible', icon: '✅', text: 'Likely Credible' };
+    } else if (score >= 45) {
+      return { label: 'Uncertain', icon: '⚠️', text: 'Unverified Claim' };
+    } else {
+      return { label: 'Misleading', icon: '🚫', text: 'Likely Misleading' };
+    }
   }
 
   /**
