@@ -1,0 +1,25 @@
+const express = require('express');
+const analyzeRoutes = require('./analyze.routes');
+const feedRoutes = require('./feed.routes');
+const feedbackRoutes = require('./feedback.routes');
+const sessionRoutes = require('./session.routes');
+
+const router = express.Router();
+
+// Health check endpoint
+router.get('/health', (req, res) => {
+  res.status(200).json({
+    success: true,
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    version: process.env.npm_package_version || '1.0.0',
+  });
+});
+
+// API routes
+router.use('/analyze', analyzeRoutes);
+router.use('/feed', feedRoutes);
+router.use('/feedback', feedbackRoutes);
+router.use('/session', sessionRoutes);
+
+module.exports = router;

@@ -1,0 +1,192 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// Articles table - stores URL hash and metadata
+model Article {
+  id            String           @id @default(uuid())
+  urlHash       String           @unique @map("url_hash")
+  originalUrl   String           @map("original_url")
+  title         String?
+  author        String?
+  publishedAt   DateTime?        @map("published_at")
+  source        String?
+  content       String?
+  contentType   String           @default("NEWS") @map("content_type")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+
+  // Relations
+  analysisResults AnalysisResult[]
+  claims          Claim[]
+
+  @@index([urlHash])
+  @@index([createdAt])
+  @@map("articles")
+}
+
+// Content types: NEWS, OPINION, SATIRE, BREAKING, UNKNOWN
+
+// Analysis Results table - stores credibility score and explanation
+model AnalysisResult {
+  id              String        @id @default(uuid())
+  articleId       String        @map("article_id")
+  score           Int           // 0-100 credibility score
+  confidence      Float         // Model confidence level
+  explanation     String
+  summary         String?
+  factualClaims   Int           @default(0) @map("factual_claims")
+  verifiedClaims  Int           @default(0) @map("verified_claims")
+  sourceQuality   Float?        @map("source_quality")
+  biasIndicator   String?       @map("bias_indicator")
+  modelVersion    String        @map("model_version")
+  processingTime  Int?          @map("processing_time") // in milliseconds
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  // Relations
+  article         Article       @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([articleId])
+  @@index([createdAt])
+  @@map("analysis_results")
+}
+
+// Claims table - stores verification per claim
+model Claim {
+  id              String        @id @default(uuid())
+  articleId       String        @map("article_id")
+  claimText       String        @map("claim_text")
+  claimType       String        @default("FACTUAL") @map("claim_type")
+  isVerified      Boolean       @default(false) @map("is_verified")
+  verificationStatus String     @default("PENDING") @map("verification_status")
+  confidence      Float         @default(0)
+  evidence        String?
+  sources         String        @default("[]") // JSON array as string
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  article         Article       @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([articleId])
+  @@index([verificationStatus])
+  @@map("claims")
+}
+
+// ClaimType: FACTUAL, OPINION, STATISTICAL, QUOTE, PREDICTION
+// VerificationStatus: PENDING, VERIFIED, FALSE, MISLEADING, UNVERIFIABLE, PARTIALLY_TRUE
+
+// Feed Items table - stores flashcard feed
+model FeedItem {
+  id              String        @id @default(uuid())
+  title           String
+  summary         String
+  imageUrl        String?       @map("image_url")
+  sourceUrl       String        @map("source_url")
+  sourceName      String        @map("source_name")
+  credibilityScore Int          @map("credibility_score")
+  category        String?
+  tags            String        @default("[]") // JSON array as string
+  isVerified      Boolean       @default(true) @map("is_verified")
+  publishedAt     DateTime      @map("published_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  expiresAt       DateTime?     @map("expires_at")
+
+  // Relations
+  swipes          SwipeFeedback[]
+
+  @@index([createdAt])
+  @@index([category])
+  @@index([credibilityScore])
+  @@map("feed_items")
+}
+
+// User sessions for anonymous tracking
+model UserSession {
+  id              String        @id @default(uuid())
+  sessionToken    String        @unique @map("session_token")
+  ipAddress       String?       @map("ip_address")
+  userAgent       String?       @map("user_agent")
+  preferences     String?       // JSON string for preferences
+  createdAt       DateTime      @default(now()) @map("created_at")
+  lastActiveAt    DateTime      @default(now()) @map("last_active_at")
+
+  // Relations
+  swipes          SwipeFeedback[]
+  analyses        AnalysisRequest[]
+
+  @@index([sessionToken])
+  @@map("user_sessions")
+}
+
+// Swipe Feedback - for learning preferences
+model SwipeFeedback {
+  id              String        @id @default(uuid())
+  sessionId       String        @map("session_id")
+  feedItemId      String        @map("feed_item_id")
+  direction       String        // LEFT, RIGHT, UP, DOWN
+  dwellTime       Int?          @map("dwell_time") // time spent on card in ms
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  // Relations
+  session         UserSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  feedItem        FeedItem      @relation(fields: [feedItemId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, feedItemId])
+  @@index([sessionId])
+  @@index([feedItemId])
+  @@map("swipe_feedback")
+}
+
+// SwipeDirection: LEFT (dismiss), RIGHT (save), UP (share), DOWN (report)
+
+// Analysis Request tracking
+model AnalysisRequest {
+  id              String        @id @default(uuid())
+  sessionId       String?       @map("session_id")
+  apiKey          String?       @map("api_key")
+  requestType     String        @map("request_type") // URL or TEXT
+  inputUrl        String?       @map("input_url")
+  inputHash       String?       @map("input_hash")
+  status          String        @default("PENDING")
+  resultId        String?       @map("result_id")
+  errorMessage    String?       @map("error_message")
+  ipAddress       String?       @map("ip_address")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  completedAt     DateTime?     @map("completed_at")
+
+  // Relations
+  session         UserSession?  @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("analysis_requests")
+}
+
+// RequestType: URL, TEXT
+// RequestStatus: PENDING, PROCESSING, COMPLETED, FAILED, CACHED
+
+// API Keys for extension authentication
+model ApiKey {
+  id              String        @id @default(uuid())
+  key             String        @unique
+  name            String
+  isActive        Boolean       @default(true) @map("is_active")
+  rateLimit       Int           @default(100) @map("rate_limit")
+  usageCount      Int           @default(0) @map("usage_count")
+  lastUsedAt      DateTime?     @map("last_used_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  expiresAt       DateTime?     @map("expires_at")
+
+  @@index([key])
+  @@map("api_keys")
+}

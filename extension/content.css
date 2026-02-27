@@ -1,0 +1,159 @@
+/* =========================================================
+   Clarix Extension — content.css
+   Injected side-panel styles. Clean black/white, solid pastels.
+   ========================================================= */
+
+#clarix-side-panel {
+  position: fixed;
+  top: 80px;
+  right: 0;
+  width: 320px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  z-index: 2147483647;
+  background: #0a0a0a;
+  border: 1px solid #272727;
+  border-right: none;
+  border-radius: 10px 0 0 10px;
+  box-shadow: -6px 0 32px rgba(0, 0, 0, 0.7);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: #f0f0f0;
+  font-size: 13px;
+  animation: clarix-slide-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  scrollbar-width: thin;
+  scrollbar-color: #2a2a2a transparent;
+}
+
+@keyframes clarix-slide-in {
+  from { opacity: 0; transform: translateX(40px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.clarix-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 13px 10px;
+  border-bottom: 1px solid #222222;
+  background: #111111;
+  border-radius: 10px 0 0 0;
+}
+
+.clarix-panel-logo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 14px;
+  color: #f0f0f0;
+  letter-spacing: -0.3px;
+}
+
+.clarix-panel-close {
+  background: none;
+  border: none;
+  color: #555555;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 5px;
+  line-height: 0;
+  transition: color 0.15s, background 0.15s;
+}
+.clarix-panel-close:hover { color: #f0f0f0; background: #1c1c1c; }
+
+.clarix-panel-body {
+  padding: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.clarix-selected-text {
+  background: #111111;
+  border: 1px solid #222222;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: #aaaaaa;
+  line-height: 1.55;
+  max-height: 80px;
+  overflow-y: auto;
+  word-break: break-word;
+}
+
+.clarix-analyze-btn {
+  width: 100%;
+  padding: 9px;
+  background: #f0f0f0;
+  border: none;
+  border-radius: 7px;
+  color: #0a0a0a;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.12s;
+}
+.clarix-analyze-btn:hover { background: #ffffff; }
+.clarix-analyze-btn:active { transform: scale(0.98); }
+.clarix-analyze-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+/* Score row */
+.clarix-score-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.clarix-score-badge {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 2.5px solid #8ecfaa;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: #111111;
+}
+.clarix-score-badge.low    { border-color: #e08c8c; }
+.clarix-score-badge.medium { border-color: #e0c97a; }
+
+.clarix-score-val {
+  font-size: 17px;
+  font-weight: 700;
+  color: #8ecfaa;
+  line-height: 1;
+}
+.clarix-score-badge.low .clarix-score-val    { color: #e08c8c; }
+.clarix-score-badge.medium .clarix-score-val { color: #e0c97a; }
+
+.clarix-score-lbl {
+  font-size: 8px;
+  color: #555555;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+
+.clarix-verdict {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #f0f0f0;
+}
+.clarix-verdict-sub {
+  font-size: 11px;
+  color: #555555;
+  margin-top: 2px;
+}
+
+.clarix-explanation {
+  font-size: 12px;
+  color: #888888;
+  line-height: 1.6;
+  background: #111111;
+  border: 1px solid #222222;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
