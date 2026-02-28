@@ -38,7 +38,7 @@ _transform: transforms.Compose | None = None
 CLASS_LABELS = {0: "Deepfake", 1: "Real"}
 
 # Default model path (relative to project root)
-DEFAULT_MODEL_PATH = Path(__file__).resolve().parent.parent / "deepfake_model.pth"
+DEFAULT_MODEL_PATH = Path(__file__).resolve().parent.parent / "image_model" / "deepfake_model.pth"
 
 
 # ── Preprocessing pipeline ─────────────────────────────────────────────
@@ -77,7 +77,12 @@ def load_model(model_path: str | Path | None = None) -> None:
     # Build EfficientNet-B0 with modified classifier head (2 classes)
     _model = models.efficientnet_b0(weights=None)
     in_features = _model.classifier[1].in_features
-    _model.classifier[1] = torch.nn.Linear(in_features, 2)
+    _model.classifier[1] = torch.nn.Sequential(
+        torch.nn.Linear(in_features, 256),
+        torch.nn.Dropout(0.3),
+        torch.nn.ReLU(),
+        torch.nn.Linear(256, 2),
+    )
 
     # Load trained weights
     state_dict = torch.load(path, map_location=_device, weights_only=True)

@@ -932,7 +932,7 @@ export default function Home() {
                     No analyses yet. Try analyzing some content!
                   </p>
                 ) : (
-                  recentHistory.map((item) => (
+                  recentHistory.slice(0, 6).map((item) => (
                     <button
                       key={item.id}
                       className="flex items-start gap-3 rounded-lg border border-transparent p-2.5 text-left transition-colors hover:border-border hover:bg-surface-2"
