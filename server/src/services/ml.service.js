@@ -1,6 +1,7 @@
 /**
  * ML Service — calls the Python Clarix engine's /predict endpoint
- * for HuggingFace-based fake news detection.
+ * for HuggingFace-based fake news detection, and /detect-deepfake
+ * for image deepfake analysis.
  */
 
 const config = require('../config');
@@ -77,6 +78,80 @@ class MLService {
       return data.status === 'ok' && data.hf_model_loaded === true;
     } catch {
       return false;
+    }
+  }
+
+  /**
+   * Check if the deepfake detection model is loaded on the Python engine.
+   */
+  async isDeepfakeAvailable() {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+
+      const response = await fetch(`${ENGINE_URL}/health`, {
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      if (!response.ok) return false;
+      const data = await response.json();
+      return data.status === 'ok' && data.deepfake_model_loaded === true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Detect deepfake in an image via the Python FastAPI engine.
+   * @param {Buffer} imageBuffer - Raw image bytes
+   * @param {string} filename - Original filename
+   * @param {string} mimetype - MIME type (e.g., 'image/jpeg')
+   * @returns {{ label, confidence, deepfake_probability, real_probability } | null}
+   */
+  async detectDeepfake(imageBuffer, filename, mimetype) {
+    try {
+      const { Blob } = require('node:buffer');
+      const blob = new Blob([imageBuffer], { type: mimetype });
+      const formData = new FormData();
+      formData.append('file', blob, filename);
+
+      const headers = {};
+      if (INTERNAL_TOKEN) {
+        headers['X-Internal-Token'] = INTERNAL_TOKEN;
+      }
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 60000);
+
+      const response = await fetch(`${ENGINE_URL}/detect-deepfake`, {
+        method: 'POST',
+        headers,
+        body: formData,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        const errBody = await response.text();
+        logger.warn(`Deepfake detect returned ${response.status}: ${errBody}`);
+        return null;
+      }
+
+      const result = await response.json();
+      logger.info(
+        `Deepfake: ${result.label} (confidence: ${result.confidence}%, real: ${result.real_probability}%, deepfake: ${result.deepfake_probability}%)`
+      );
+      return result;
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        logger.warn('Deepfake detect timed out after 60s');
+      } else {
+        logger.warn(`Deepfake detect unavailable: ${error.message}`);
+      }
+      return null;
     }
   }
 }

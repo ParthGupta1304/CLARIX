@@ -1,4 +1,4 @@
-const { credibilityService } = require('../services');
+const { credibilityService, mlService } = require('../services');
 const { queueAnalysis } = require('../queues');
 const prisma = require('../lib/prisma');
 const logger = require('../utils/logger');
@@ -333,10 +333,63 @@ const getAnalysisStatus = async (req, res, next) => {
   }
 };
 
+/**
+ * Analyze uploaded image for deepfake detection
+ * POST /api/analyze/image
+ * Expects multipart/form-data with field "file"
+ */
+const analyzeImage = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No image file uploaded' });
+    }
+
+    const result = await mlService.detectDeepfake(
+      req.file.buffer,
+      req.file.originalname,
+      req.file.mimetype
+    );
+
+    if (!result) {
+      return res.status(503).json({
+        success: false,
+        error: 'Deepfake detection service unavailable',
+      });
+    }
+
+    const isReal = result.label === 'Real';
+    const score = isReal
+      ? Math.round(result.real_probability)
+      : Math.round(100 - result.deepfake_probability);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        score,
+        verdict: score >= 70 ? 'Credible' : score >= 45 ? 'Uncertain' : 'Misleading',
+        analysisType: 'image',
+        deepfakePrediction: {
+          label: result.label,
+          confidence: result.confidence,
+          deepfakeProbability: result.deepfake_probability,
+          realProbability: result.real_probability,
+        },
+        explanation: isReal
+          ? `Image appears authentic (${result.confidence.toFixed(1)}% confidence). No deepfake artifacts detected.`
+          : `Potential deepfake detected (${result.confidence.toFixed(1)}% confidence).`,
+      },
+    });
+  } catch (error) {
+    logger.error(`Analyze image error: ${error.message}`);
+    next(error);
+  }
+};
+
 module.exports = {
   analyze,
   analyzeUrl,
   analyzeText,
+  analyzeImage,
   getAnalysis,
   getHistory,
   getStats,

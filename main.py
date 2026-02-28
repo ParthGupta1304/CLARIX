@@ -305,5 +305,5 @@ if __name__ == "__main__":
         host=settings.host,
         port=settings.port,
         log_level=settings.log_level,
-        reload=True,
+        reload=False,  # reload=True breaks deepfake model state (subprocess loses loaded weights)
     )

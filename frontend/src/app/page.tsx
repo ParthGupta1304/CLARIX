@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
+const PYTHON_API = process.env.NEXT_PUBLIC_PYTHON_API_URL || "http://localhost:8000";
 import {
   Layers,
   FileText,
@@ -48,6 +49,13 @@ interface MLPrediction {
   fakeProbability: number;
 }
 
+interface DeepfakePrediction {
+  label: "Real" | "Deepfake";
+  confidence: number;
+  deepfakeProbability: number;
+  realProbability: number;
+}
+
 interface AnalysisResult {
   score: number;
   verdict: "Credible" | "Uncertain" | "Misleading";
@@ -57,6 +65,8 @@ interface AnalysisResult {
   explanation: string;
   sources: { title: string; url: string }[];
   mlPrediction: MLPrediction | null;
+  deepfakePrediction: DeepfakePrediction | null;
+  analysisType: "text" | "image" | "page";
 }
 
 /* ── API helpers ────────────────────────────────────────── */
@@ -82,7 +92,59 @@ async function analyzeContent(
     explanation: d.explanation ?? d.analysis?.explanation ?? "",
     sources: d.sources ?? [],
     mlPrediction: d.mlPrediction ?? null,
+    deepfakePrediction: null,
+    analysisType: type,
   };
+}
+
+/** Upload image file directly to Python engine for deepfake detection */
+async function analyzeImageFile(file: File): Promise<AnalysisResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch(`${PYTHON_API}/detect-deepfake`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Analysis failed" }));
+    throw new Error(err.detail || "Deepfake detection failed");
+  }
+  const data = await res.json();
+
+  const isReal = data.label === "Real";
+  const score = isReal
+    ? Math.round(data.real_probability)
+    : Math.round(100 - data.deepfake_probability);
+
+  return {
+    score,
+    verdict: score >= 70 ? "Credible" : score >= 45 ? "Uncertain" : "Misleading",
+    factCheck: 0,
+    sourceCredibility: 0,
+    sentimentBias: 0,
+    explanation: isReal
+      ? `This image appears to be authentic with ${data.confidence.toFixed(1)}% confidence. No signs of deepfake manipulation were detected.`
+      : `This image shows signs of potential deepfake manipulation with ${data.confidence.toFixed(1)}% confidence. The AI model detected visual artifacts consistent with synthetic media.`,
+    sources: [],
+    mlPrediction: null,
+    deepfakePrediction: {
+      label: data.label,
+      confidence: data.confidence,
+      deepfakeProbability: data.deepfake_probability,
+      realProbability: data.real_probability,
+    },
+    analysisType: "image",
+  };
+}
+
+/** Fetch image from URL, convert to File, then run deepfake detection */
+async function analyzeImageUrl(url: string): Promise<AnalysisResult> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Failed to fetch image from URL");
+  const blob = await res.blob();
+  const file = new File([blob], "image.jpg", { type: blob.type || "image/jpeg" });
+  return analyzeImageFile(file);
 }
 
 async function fetchStats(): Promise<{
@@ -283,6 +345,7 @@ export default function Home() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [activeTab, setActiveTab] = useState("text");
   const [dragActive, setDragActive] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [stats, setStats] = useState<QuickStats>({ claimsChecked: 0, accuracyRate: 93, pagesScanned: 0, flaggedItems: 0 });
   const [recentHistory, setRecentHistory] = useState<HistoryItem[]>([]);
@@ -308,7 +371,13 @@ export default function Home() {
       if (activeTab === "text") {
         res = await analyzeContent("text", textInput);
       } else if (activeTab === "image") {
-        res = await analyzeContent("image", imageUrl || uploadedFileName || "");
+        if (uploadedFile) {
+          res = await analyzeImageFile(uploadedFile);
+        } else if (imageUrl.trim()) {
+          res = await analyzeImageUrl(imageUrl);
+        } else {
+          throw new Error("No image provided");
+        }
       } else {
         res = await analyzeContent("page", pageUrl, pageUrl);
       }
@@ -319,12 +388,13 @@ export default function Home() {
     } finally {
       setIsAnalyzing(false);
     }
-  }, [activeTab, textInput, imageUrl, uploadedFileName, pageUrl, refreshSidebar]);
+  }, [activeTab, textInput, uploadedFile, imageUrl, pageUrl, refreshSidebar]);
 
   const handleReset = useCallback(() => {
     setResult(null);
     setTextInput("");
     setImageUrl("");
+    setUploadedFile(null);
     setUploadedFileName(null);
   }, []);
 
@@ -333,6 +403,7 @@ export default function Home() {
     setDragActive(false);
     const file = e.dataTransfer.files[0];
     if (file && file.type.startsWith("image/")) {
+      setUploadedFile(file);
       setUploadedFileName(file.name);
     }
   }, []);
@@ -341,6 +412,7 @@ export default function Home() {
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) {
+        setUploadedFile(file);
         setUploadedFileName(file.name);
       }
     },
@@ -514,6 +586,7 @@ export default function Home() {
                             className="text-xs text-muted-foreground"
                             onClick={(e) => {
                               e.stopPropagation();
+                              setUploadedFile(null);
                               setUploadedFileName(null);
                             }}
                           >
@@ -679,24 +752,64 @@ export default function Home() {
 
                   <Separator />
 
-                  {/* Breakdown */}
-                  <div className="flex flex-col gap-3">
-                    <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      Signal Breakdown
-                    </h3>
-                    <BreakdownBar
-                      label="Fact-Check"
-                      value={result.factCheck}
-                    />
-                    <BreakdownBar
-                      label="Source Credibility"
-                      value={result.sourceCredibility}
-                    />
-                    <BreakdownBar
-                      label="Sentiment / Bias"
-                      value={result.sentimentBias}
-                    />
-                  </div>
+                  {/* Breakdown — text/page analysis */}
+                  {!result.deepfakePrediction && (
+                    <div className="flex flex-col gap-3">
+                      <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Signal Breakdown
+                      </h3>
+                      <BreakdownBar
+                        label="Fact-Check"
+                        value={result.factCheck}
+                      />
+                      <BreakdownBar
+                        label="Source Credibility"
+                        value={result.sourceCredibility}
+                      />
+                      <BreakdownBar
+                        label="Sentiment / Bias"
+                        value={result.sentimentBias}
+                      />
+                    </div>
+                  )}
+
+                  {/* Deepfake Detection — image analysis */}
+                  {result.deepfakePrediction && (
+                    <div className="flex flex-col gap-3">
+                      <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Deepfake Detection
+                      </h3>
+                      <div className="rounded-lg bg-surface-2 p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              variant="outline"
+                              className={`text-xs font-bold ${
+                                result.deepfakePrediction.label === "Real"
+                                  ? "bg-pastel-green/15 text-pastel-green border-pastel-green/25"
+                                  : "bg-pastel-red/15 text-pastel-red border-pastel-red/25"
+                              }`}
+                            >
+                              {result.deepfakePrediction.label}
+                            </Badge>
+                            <span className="text-sm font-semibold">
+                              {result.deepfakePrediction.confidence.toFixed(1)}% confidence
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <BreakdownBar
+                            label="Real"
+                            value={Math.round(result.deepfakePrediction.realProbability)}
+                          />
+                          <BreakdownBar
+                            label="Deepfake"
+                            value={Math.round(result.deepfakePrediction.deepfakeProbability)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* ML Model Prediction */}
                   {result.mlPrediction && (

@@ -1,8 +1,19 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const { analyzeController } = require('../controllers');
 const { requireAuth, requireSession, analysisLimiter } = require('../middleware');
 const { validate, analyzeUrlSchema, analyzeTextSchema } = require('../validators');
+
+// Multer config for image upload (in-memory, 10 MB limit)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Only image files are allowed'), false);
+  },
+});
 
 /**
  * @route   POST /api/analyze
@@ -40,6 +51,19 @@ router.post(
   requireAuth,
   validate(analyzeTextSchema),
   analyzeController.analyzeText
+);
+
+/**
+ * @route   POST /api/analyze/image
+ * @desc    Analyze uploaded image for deepfake detection
+ * @access  Requires API key or session
+ */
+router.post(
+  '/image',
+  analysisLimiter,
+  requireAuth,
+  upload.single('file'),
+  analyzeController.analyzeImage
 );
 
 /**
