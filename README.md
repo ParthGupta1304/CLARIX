@@ -489,7 +489,11 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 
 <div align="center">
 
-**Built with ❤️ by [Parth Gupta](https://github.com/ParthGupta1304)**
+**Built with ❤️ by the CLARIX Team:**
+
+- [Parth Gupta](https://linkedin.com/in/parth-gupta-0a4076266) ([GitHub](https://github.com/ParthGupta1304))
+- [Yash Vasudeva](https://www.linkedin.com/in/yash-vasudeva)
+- [Shivam Bhardwaj](https://www.linkedin.com/in/svmbhardwaj)
 
 *Fighting misinformation, one claim at a time.*
 

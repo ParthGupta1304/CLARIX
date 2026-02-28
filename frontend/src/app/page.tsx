@@ -320,7 +320,7 @@ function ScoreRing({
 function BreakdownBar({ label, value }: { label: string; value: number }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="w-32 shrink-0 text-sm text-muted-foreground">
+      <span className="w-32 shrink-0 text-sm text-white">
         {label}
       </span>
       <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2">
@@ -755,11 +755,12 @@ export default function Home() {
                   {/* Breakdown — text/page analysis */}
                   {!result.deepfakePrediction && (
                     <div className="flex flex-col gap-3">
-                      <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      <h3 className="text-[15px] font-semibold text-white uppercase tracking-wider text-muted-foreground">
                         Signal Breakdown
                       </h3>
                       <BreakdownBar
                         label="Fact-Check"
+                        
                         value={result.factCheck}
                       />
                       <BreakdownBar
@@ -852,10 +853,10 @@ export default function Home() {
 
                   {/* Explanation */}
                   <div className="flex flex-col gap-2">
-                    <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <h3 className="text-[15px] font-semibold uppercase tracking-wider text-white text-muted-foreground">
                       Why?
                     </h3>
-                    <p className="text-sm leading-relaxed text-muted-foreground">
+                    <p className="text-sm leading-relaxed text-white">
                       {result.explanation}
                     </p>
                   </div>
