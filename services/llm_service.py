@@ -31,6 +31,12 @@ def _build_client() -> tuple[AsyncOpenAI, str]:
             api_key="not-needed",
         )
         model = settings.local_llm_model
+    elif provider == "groq":
+        client = AsyncOpenAI(
+            base_url="https://api.groq.com/openai/v1",
+            api_key=settings.groq_api_key,
+        )
+        model = settings.groq_model
     else:  # default: openai
         client = AsyncOpenAI(api_key=settings.openai_api_key)
         model = settings.openai_model

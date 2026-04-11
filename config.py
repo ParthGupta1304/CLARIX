@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # --- LLM provider --------------------------------------------------
-    llm_provider: str = "openai"  # "openai" | "azure" | "local"
+    llm_provider: str = "openai"  # "openai" | "azure" | "local" | "groq"
 
     # OpenAI
     openai_api_key: str = ""
@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     # Local / Ollama
     local_llm_base_url: str = "http://localhost:11434/v1"
     local_llm_model: str = "llama3"
+
+    # Groq API
+    groq_api_key: str = ""
+    groq_model: str = "llama-3.3-70b-versatile"
 
     # --- Server ---------------------------------------------------------
     host: str = "0.0.0.0"

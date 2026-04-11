@@ -28,6 +28,12 @@ const config = {
     model: process.env.OPENAI_MODEL || 'gpt-4-turbo-preview',
   },
 
+  // Groq / LLM
+  groq: {
+    apiKey: process.env.GROQ_API_KEY,
+    model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+  },
+
   // Supabase (pgvector)
   supabase: {
     supabaseUrl: process.env.SUPABASE_URL,

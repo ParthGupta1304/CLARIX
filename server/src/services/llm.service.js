@@ -4,10 +4,19 @@ const logger = require('../utils/logger');
 
 class LLMService {
   constructor() {
-    this.client = new OpenAI({
-      apiKey: config.openai.apiKey,
-    });
-    this.model = config.openai.model;
+    const provider = process.env.LLM_PROVIDER || 'openai';
+    if (provider === 'groq') {
+      this.client = new OpenAI({
+        apiKey: config.groq.apiKey,
+        baseURL: "https://api.groq.com/openai/v1",
+      });
+      this.model = config.groq.model;
+    } else {
+      this.client = new OpenAI({
+        apiKey: config.openai.apiKey,
+      });
+      this.model = config.openai.model;
+    }
   }
 
   /**
