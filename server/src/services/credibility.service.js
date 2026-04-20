@@ -183,8 +183,8 @@ class CredibilityService {
     }
 
     // 8. Calculate verified claims count
-    logger.info(`Step 8: Calculating final numbers (${verifiedCount} verified claims)...`);
     const verifiedCount = verifications.filter(v => v.status === 'VERIFIED').length;
+    logger.info(`Step 8: Calculating final numbers (${verifiedCount} verified claims)...`);
 
     // 9. Store analysis result
     logger.info(`Step 9: Storing final analysis result in database...`);
