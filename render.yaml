@@ -6,6 +6,10 @@ services:
     startCommand: gunicorn main:app -w 2 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --timeout 120
     plan: free
     envVars:
+      - key: DEEPFAKE_PROVIDER
+        value: bitmind
+      - key: BITMIND_API_KEY
+        sync: false
       - key: LLM_PROVIDER
         value: groq
       - key: GROQ_MODEL

@@ -8,6 +8,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
+    # --- Deepfake detection provider -----------------------------------
+    # "bitmind" uses the Bitmind cloud API (recommended for production)
+    # "local"   uses the local EfficientNet-B0 model (no API key needed)
+    deepfake_provider: str = "bitmind"  # "bitmind" | "local"
+    bitmind_api_key: str = ""
+    bitmind_api_url: str = "https://api.bitmind.ai/oracle/v1/detect"
+
     # --- LLM provider --------------------------------------------------
     llm_provider: str = "openai"  # "openai" | "azure" | "local" | "groq"
 
