@@ -169,7 +169,9 @@ async function fetchStats(): Promise<{
   flaggedItems: number;
 }> {
   try {
-    const res = await fetch(`${API_BASE}/stats`);
+    const res = await fetch(`${API_BASE}/stats`, {
+      headers: { "x-api-key": process.env.NEXT_PUBLIC_API_KEY || "" },
+    });
     if (!res.ok) throw new Error();
     const json = await res.json();
     return { ...json.data, accuracyRate: 93 };
