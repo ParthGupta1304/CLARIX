@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
-const PYTHON_API = process.env.NEXT_PUBLIC_PYTHON_API_URL || "http://localhost:8000";
+const PYTHON_API = process.env.NEXT_PUBLIC_PYTHON_API_URL || "https://clarix-text-model.onrender.com";
 import {
   Layers,
   FileText,

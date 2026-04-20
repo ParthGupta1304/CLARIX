@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: clarix-text-model
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn main:app -w 2 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --timeout 120
+    plan: free
+    envVars:
+      - key: LLM_PROVIDER
+        value: groq
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4.1-mini
+      - key: HOST
+        value: 0.0.0.0
+      - key: LOG_LEVEL
+        value: info
+      - key: INTERNAL_TOKEN
+        value: ""
+      - key: ALLOWED_ORIGINS
+        value: "*"
+      - key: MAX_CLAIMS
+        value: "10"
+      - key: VERIFICATION_TEMPERATURE
+        value: "0.2"
