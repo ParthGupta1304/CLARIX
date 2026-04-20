@@ -127,6 +127,7 @@ class CredibilityService {
     });
 
     // 2. Extract claims + run ML prediction in parallel
+    logger.info(`Step 2: Extracting claims and running ML prediction...`);
     const [extractedClaims, mlPrediction] = await Promise.all([
       llmService.extractClaims(content, title),
       mlService.predictFakeNews(content).catch((err) => {
@@ -142,15 +143,19 @@ class CredibilityService {
     }
     
     // 3. Retrieve relevant context for claims (RAG)
+    logger.info(`Step 3: Retrieving context for ${extractedClaims.length} claims via RAG...`);
     const retrievedContext = await ragService.retrieveForClaims(extractedClaims);
 
     // 4. Verify claims
+    logger.info(`Step 4: LLM verifying claims against retrieved context...`);
     const verifications = await llmService.verifyClaims(extractedClaims, retrievedContext);
 
     // 5. Store claims in database
+    logger.info(`Step 5: Storing claims and verification results in database...`);
     const storedClaims = await this.storeClaims(article.id, extractedClaims, verifications);
 
     // 6. Get credibility analysis
+    logger.info(`Step 6: LLM generating overall credibility analysis...`);
     const credibilityResult = await llmService.analyzeCredibility(
       content, 
       title, 
@@ -178,9 +183,11 @@ class CredibilityService {
     }
 
     // 8. Calculate verified claims count
+    logger.info(`Step 8: Calculating final numbers (${verifiedCount} verified claims)...`);
     const verifiedCount = verifications.filter(v => v.status === 'VERIFIED').length;
 
     // 9. Store analysis result
+    logger.info(`Step 9: Storing final analysis result in database...`);
     const analysisResult = await prisma.analysisResult.create({
       data: {
         articleId: article.id,
@@ -202,6 +209,7 @@ class CredibilityService {
     });
 
     // 10. Log the request
+    logger.info(`Step 10: Formatting request completion... Analysis Done!`);
     await this.logRequest(sessionId, originalUrl ? 'URL' : 'TEXT', originalUrl, urlHash, 'COMPLETED', analysisResult.id);
 
     return this.formatAnalysisResult(article, analysisResult, storedClaims, credibilityResult, mlPrediction);
