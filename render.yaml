@@ -1,34 +1,101 @@
 services:
+  # ── 1. Python FastAPI Engine ─────────────────────────────────────────
   - type: web
-    name: clarix-text-model
+    name: clarix-engine
     runtime: python
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn main:app -w 2 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --timeout 120
     plan: free
     envVars:
+      # Deepfake detection
       - key: DEEPFAKE_PROVIDER
         value: bitmind
       - key: BITMIND_API_KEY
-        sync: false
+        sync: false                 # ← set manually in Render dashboard
+      # LLM provider
       - key: LLM_PROVIDER
         value: groq
       - key: GROQ_MODEL
         value: llama-3.3-70b-versatile
       - key: GROQ_API_KEY
-        sync: false
+        sync: false                 # ← set manually in Render dashboard
       - key: OPENAI_API_KEY
-        sync: false
+        sync: false                 # ← set manually in Render dashboard
       - key: OPENAI_MODEL
         value: gpt-4.1-mini
+      # Server
       - key: HOST
         value: 0.0.0.0
+      - key: PORT
+        value: "8000"
       - key: LOG_LEVEL
         value: info
       - key: INTERNAL_TOKEN
-        value: ""
+        sync: false                 # ← set manually (same value as Node server)
       - key: ALLOWED_ORIGINS
         value: "*"
+      # Pipeline
       - key: MAX_CLAIMS
         value: "10"
       - key: VERIFICATION_TEMPERATURE
         value: "0.2"
+
+  # ── 2. Node.js Express Server ────────────────────────────────────────
+  - type: web
+    name: clarix-server
+    runtime: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    plan: free
+    envVars:
+      # Server
+      - key: PORT
+        value: "3000"
+      - key: NODE_ENV
+        value: production
+      # Database (Neon PostgreSQL)
+      - key: DATABASE_URL
+        sync: false                 # ← set manually in Render dashboard
+      # Redis — Render free doesn't have Redis; use upstash.com free tier
+      - key: REDIS_URL
+        sync: false                 # ← set manually in Render dashboard
+      # JWT
+      - key: JWT_SECRET
+        sync: false                 # ← set manually in Render dashboard
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      # API Keys
+      - key: PUBLIC_API_KEY
+        sync: false                 # ← set manually in Render dashboard
+      # LLM
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4.1-mini
+      - key: LLM_PROVIDER
+        value: groq
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile
+      # Supabase
+      - key: SUPABASE_URL
+        sync: false                 # ← set manually in Render dashboard
+      - key: SUPABASE_SERVICE_KEY
+        sync: false                 # ← set manually in Render dashboard
+      # Clarix Python Engine URL — update after clarix-engine is deployed
+      - key: CLARIX_ENGINE_URL
+        sync: false                 # ← set to your clarix-engine Render URL
+      - key: CLARIX_INTERNAL_TOKEN
+        sync: false                 # ← same value as Python engine INTERNAL_TOKEN
+      # Rate Limiting
+      - key: RATE_LIMIT_WINDOW_MS
+        value: "60000"
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: "100"
+      # Cache TTL
+      - key: CACHE_TTL_ANALYSIS
+        value: "3600"
+      - key: CACHE_TTL_FEED
+        value: "300"
