@@ -33,6 +33,7 @@ app.use(cors({
         /^chrome-extension:\/\//,
         /^moz-extension:\/\//,
         /\.clarix\.app$/,
+        /\.vercel\.app$/,
       ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],

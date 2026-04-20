@@ -77,7 +77,7 @@ async function analyzeContent(
 ): Promise<AnalysisResult> {
   const res = await fetch(`${API_BASE}/analyze`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-api-key": "clarix-public-api-key-change-in-production" },
+    headers: { "Content-Type": "application/json", "x-api-key": process.env.NEXT_PUBLIC_API_KEY || "" },
     body: JSON.stringify({ type, content, url }),
   });
   if (!res.ok) {
@@ -181,7 +181,7 @@ async function fetchStats(): Promise<{
 async function fetchHistory(): Promise<HistoryItem[]> {
   try {
     const res = await fetch(`${API_BASE}/analyze/history`, {
-      headers: { "x-api-key": "clarix-public-api-key-change-in-production" },
+      headers: { "x-api-key": process.env.NEXT_PUBLIC_API_KEY || "" },
     });
     if (!res.ok) throw new Error();
     const json = await res.json();
