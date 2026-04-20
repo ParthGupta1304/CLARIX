@@ -5,6 +5,12 @@ const logger = require('../utils/logger');
 class LLMService {
   constructor() {
     const provider = process.env.LLM_PROVIDER || 'openai';
+    
+    // Client for embeddings (always OpenAI)
+    this.embeddingClient = new OpenAI({
+      apiKey: config.openai?.apiKey || process.env.OPENAI_API_KEY,
+    });
+
     if (provider === 'groq') {
       this.client = new OpenAI({
         apiKey: config.groq.apiKey,
@@ -12,9 +18,7 @@ class LLMService {
       });
       this.model = config.groq.model;
     } else {
-      this.client = new OpenAI({
-        apiKey: config.openai.apiKey,
-      });
+      this.client = this.embeddingClient;
       this.model = config.openai.model;
     }
   }
@@ -221,7 +225,7 @@ Status definitions:
    */
   async generateEmbedding(text) {
     try {
-      const response = await this.client.embeddings.create({
+      const response = await this.embeddingClient.embeddings.create({
         model: 'text-embedding-3-small',
         input: text.substring(0, 8000),
       });

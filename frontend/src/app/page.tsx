@@ -80,7 +80,16 @@ async function analyzeContent(
     headers: { "Content-Type": "application/json", "x-api-key": "clarix-public-api-key-change-in-production" },
     body: JSON.stringify({ type, content, url }),
   });
-  if (!res.ok) throw new Error("Analysis failed");
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error("Backend Error Response (analyze):", errText);
+    try {
+      const parsed = JSON.parse(errText);
+      throw new Error(parsed.error || parsed.message || "Analysis failed");
+    } catch {
+      throw new Error(`Analysis failed: ${res.status} ${res.statusText}`);
+    }
+  }
   const json = await res.json();
   const d = json.data;
   return {
@@ -107,8 +116,14 @@ async function analyzeImageFile(file: File): Promise<AnalysisResult> {
     body: formData,
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Analysis failed" }));
-    throw new Error(err.detail || "Deepfake detection failed");
+    const errText = await res.text();
+    console.error("Backend Error Response (detect-deepfake):", errText);
+    try {
+      const parsed = JSON.parse(errText);
+      throw new Error(parsed.detail || parsed.error || "Deepfake detection failed");
+    } catch {
+      throw new Error(`Deepfake detection failed: ${res.status} ${res.statusText}`);
+    }
   }
   const data = await res.json();
 
@@ -347,6 +362,7 @@ export default function Home() {
   const [dragActive, setDragActive] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [stats, setStats] = useState<QuickStats>({ claimsChecked: 0, accuracyRate: 93, pagesScanned: 0, flaggedItems: 0 });
   const [recentHistory, setRecentHistory] = useState<HistoryItem[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -366,6 +382,7 @@ export default function Home() {
   const handleAnalyze = useCallback(async () => {
     setIsAnalyzing(true);
     setResult(null);
+    setErrorMsg(null);
     try {
       let res: AnalysisResult;
       if (activeTab === "text") {
@@ -383,8 +400,9 @@ export default function Home() {
       }
       setResult(res);
       refreshSidebar();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Analysis failed:", err);
+      setErrorMsg(err.message || "An unexpected error occurred during analysis.");
     } finally {
       setIsAnalyzing(false);
     }
@@ -392,6 +410,7 @@ export default function Home() {
 
   const handleReset = useCallback(() => {
     setResult(null);
+    setErrorMsg(null);
     setTextInput("");
     setImageUrl("");
     setUploadedFile(null);
@@ -691,6 +710,24 @@ export default function Home() {
               </Tabs>
             </Card>
             </ScrollReveal>
+
+            {/* ERROR PANEL */}
+            {errorMsg && (
+              <ScrollReveal direction="up" delay={0.05}>
+                <Card className="border-pastel-red/30 bg-pastel-red/5 backdrop-blur-md">
+                  <CardContent className="flex items-center gap-3 py-4 px-4 text-pastel-red">
+                    <AlertTriangle className="h-5 w-5 shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold">Analysis Error</p>
+                      <p className="text-xs opacity-90">{errorMsg}</p>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-pastel-red/10" onClick={() => setErrorMsg(null)}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </CardContent>
+                </Card>
+              </ScrollReveal>
+            )}
 
             {/* ── Result Panel ────────────────────────────── */}
             {result && (
